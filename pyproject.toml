@@ -1,0 +1,66 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "roadsense"
+version = "0.1.0"
+description = "Predictive road degradation and budget optimisation for Nigeria's federal road network"
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "RoadSense Nigeria" }]
+
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "pyarrow>=15",
+    "duckdb>=1.0",
+]
+
+[project.optional-dependencies]
+# Imagery sampling. Heavy native wheels, only needed from phase 3 onwards.
+geo = [
+    "rasterio>=1.4",
+    "shapely>=2.0",
+    "pyproj>=3.6",
+]
+# Modelling. Phase 5 onwards.
+model = [
+    "scikit-learn>=1.4",
+    "scikit-survival>=0.23",
+    "lifelines>=0.29",
+    "mlflow>=2.12",
+]
+# Budget optimisation. Phase 6 onwards.
+optimise = [
+    "pulp>=3.0",
+]
+# Feature store and transformation layers. Phase 4 onwards.
+platform = [
+    "feast>=0.40",
+    "dagster>=1.8",
+]
+# Dataset publishing. Reading the dataset needs none of this — it is a plain HTTPS GET.
+publish = [
+    "huggingface_hub>=1.0",
+]
+dev = [
+    "pytest>=8",
+    "ruff>=0.5",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

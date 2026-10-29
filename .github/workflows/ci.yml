@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Public repo => standard hosted runners are free and unlimited, so no minute budget here.
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # geo extras are installed so the imagery tests actually run rather than skipping. The
+      # wheels are prebuilt for every supported Python version, so this stays fast.
+      - name: Install
+        run: python -m pip install -e ".[dev,geo]"
+
+      - name: Lint
+        run: python -m ruff check src tests scripts
+
+      - name: Test
+        run: python -m pytest tests -q

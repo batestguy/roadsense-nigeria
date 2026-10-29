@@ -1,0 +1,375 @@
+RoadSense Nigeria — Final Workflow
+Predictive Road Degradation & Budget Optimisation Engine
+Project type: Cloud engineering + data science portfolio project
+Sector: Infrastructure / Transportation (FERMA-aligned)
+Core engineering challenge: Build a predictive system that forecasts road segment failure using free satellite imagery, open geospatial data, and survival analysis, then optimises maintenance budget allocation across Nigeria's federal road network.
+Budget target: $0/month recurring across all tiers
+Document type: Workflow specification with tiered tool options (no code)
+
+1. Project Vision
+Nigeria's federal road network spans over 36,000 km. FERMA has been directed to build a geo-referenced national database of failed roads, but no public system exists that predicts which roads will fail next or where every naira should be spent. RoadSense fills that gap.
+
+The system ingests satellite imagery, weather data, and open road network data, engineers degradation features over a 24-month window, trains survival models that predict time-to-failure per segment, and optimises maintenance budget allocation using linear programming. Every layer runs on free-tier infrastructure, with at least three alternative tool options per tier so the stack can be swapped without rewriting the project.
+
+2. Architecture Overview
+The workflow has nine layers, each producing artefacts consumed by the next. Every layer offers multiple free-tier options, and the system is designed so that any layer can be replaced without breaking the pipeline.
+
+text
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                          ROADSENSE NIGERIA — 9-LAYER STACK                           │
+│                                                                                      │
+│  LAYER 1 ─ DATA SOURCES          Satellite · Weather · Road Network · Labels         │
+│  LAYER 2 ─ INGESTION             Event-driven pull · Streaming · Batch               │
+│  LAYER 3 ─ ORCHESTRATION         DAG schedulers · Durable execution · Cron           │
+│  LAYER 4 ─ STORAGE               Lakehouse · Warehouse · Object store · DuckDB       │
+│  LAYER 5 ─ TRANSFORMATION        dbt · SQLMesh · Dataform · Notebooks                │
+│  LAYER 6 ─ FEATURE ENGINEERING   Feature store · Rolling windows · Parquet           │
+│  LAYER 7 ─ SURVIVAL MODELLING    Cox PH · RSF · DeepSurv · Bayesian · Ensemble       │
+│  LAYER 8 ─ OPTIMISATION          Linear programming · Budget allocation              │
+│  LAYER 9 ─ SERVING & OBSERVABILITY  API · Dashboard · Monitoring · IaC              │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+3. Layer 1 — Data Sources
+All data sources are free and open. No API keys required for the core pipeline.
+
+Source	Data Provided	Access Method	Free?
+Copernicus Data Space Ecosystem (CDSE)	Sentinel-2 L2A imagery, petabytes of Earth observation archive	STAC API, openEO, Sentinel Hub, OGC, S3	✅ Free, open
+Digital Earth Africa	Sentinel-2 L2A COGs for Africa, cloud-optimised	AWS Open Data S3	✅ Free, open
+GRID3 NGA Roads v1.0	6.2M road segments with class, surface, speed estimates	ArcGIS REST FeatureServer	✅ Free, no auth
+GRID3 Settlement Extents	Population distribution polygons	ArcGIS REST FeatureServer	✅ Free, no auth
+Open-Meteo Historical Weather API	80+ years of daily rainfall, temperature, soil moisture	REST API	✅ 10,000 calls/day free
+NiMet WIS2 API	Nigerian meteorological data via WMO WIS2 framework	WIS2 API	✅ Free, open
+Humanitarian Data Exchange (HDX)	Nigeria road network shapefiles, administrative boundaries	Direct download	✅ Free, open
+Geofabrik OSM Extract	Full Nigeria OSM data in PBF or shapefile	Direct download	✅ Free, updated daily
+OpenStreetMap Overpass API	Query road segments by bounding box or attributes	REST API	✅ Free, no key
+NASA FIRMS	Active fire data (useful for road damage from burning)	REST API	✅ Free
+Planetary Computer	Multi-source geospatial data with STAC API and SDKs	STAC API, Python SDK	✅ Free
+4. Layer 2 — Ingestion (Tiered Options)
+The ingestion layer pulls data from source APIs on a weekly schedule. Three implementation paths, each free.
+
+Option A — AWS Lambda Container Images (Serverless, Event-Driven)
+Free tier: 1M requests + 400K GB-seconds/month (Always Free)
+Why: Container images support GDAL, rasterio, pyproj, and other native geospatial libraries that cannot be packaged in standard Lambda ZIP layers. Geospatial Docker base images are publicly available and Lambda-ready.
+Use when: You want a pure AWS serverless narrative with no servers to manage.
+
+Option B — GitHub Actions Scheduled Workflows (Zero-Infrastructure)
+Free tier: 2,000 minutes/month for public repos (permanent)
+Why: No cloud account needed for compute. The workflow runs on GitHub's runners, pulls data, and pushes results to S3/R2/Supabase. The entire ingestion pipeline lives in version control alongside the code.
+Use when: You want the simplest possible setup and want to demonstrate CI/CD-native data engineering.
+
+Option C — Cloudflare Workers + Cron Triggers (Edge-Native)
+Free tier: 100,000 requests/day (permanent)
+Why: Runs at the edge, near the data. Cloudflare Workers can fetch from APIs, process JSON, and write to R2 or D1 with no cold starts. Cron triggers handle scheduling natively.
+Use when: You want to demonstrate edge computing and multi-cloud awareness.
+
+Option D — Databricks Free Edition Lakeflow Connect (Zero-ETL)
+Free tier: 100 DBUs/day per workspace (~100M records/day ingestion capacity)
+Why: Databricks Free Edition provides a full lakehouse workspace with no credit card, no fixed expiry, and native ingestion connectors. Lakeflow Connect handles incremental syncs without writing ingestion code.
+Use when: You want the modern data stack narrative with zero infrastructure management.
+
+5. Layer 3 — Orchestration (Tiered Options)
+The orchestration layer schedules, retries, and monitors the pipeline. Six free-tier options.
+
+Option A — Prefect Cloud (Free Tier)
+Free tier: 100,000 runs/month, 3 users
+Why: Python-native, modern orchestration with observability built in. Better UX than Airflow for small teams. Prefect 3.x introduced transactional semantics for exactly-once execution.
+Use when: You want a managed orchestration control plane with zero infrastructure.
+
+Option B — Dagster (Open-Source, Self-Hosted)
+Free tier: Open-source, self-host on a free VM
+Why: Asset-based orchestration (not task-based). Each layer of the pipeline is a software-defined asset with lineage, metadata, and data quality checks. This is the most "data-engineering-native" option.
+Use when: You want to demonstrate modern data orchestration thinking and asset lineage.
+
+Option C — Kestra (Open-Source, Self-Hosted)
+Free tier: Open-source, 500+ plugins, runs anywhere
+Why: YAML-based declarative orchestration with 500+ plugins covering AWS, GCP, dbt, Python, and HTTP. Alternative to Airflow with lower operational overhead.
+Use when: You want declarative orchestration without writing a DAG in Python.
+
+Option D — DBOS Transact (Open-Source, Durable Execution)
+Free tier: Core framework free forever (TypeScript, Python, Go, Java, Kotlin)
+Why: Durable execution framework founded by PostgreSQL creator Mike Stonebraker. Each step of the pipeline is durable — if a Lambda fails, it resumes from the last completed step, not from the beginning.
+Use when: You want to demonstrate durable execution patterns and fault-tolerant workflow design.
+
+Option E — Restate Cloud (Free Tier)
+Free tier: 50,000 actions/month, no credit card
+Why: Durable workflow orchestration with built-in state persistence. Each pipeline step is a durable handler that survives failures.
+Use when: You want managed durable execution without self-hosting.
+
+Option F — AWS Step Functions (Free Tier)
+Free tier: 4,000 state transitions/month
+Why: Native AWS orchestration with visual workflows. Direct integration with Lambda, DynamoDB, S3, and EventBridge. No additional infrastructure to manage.
+Use when: You are already committed to the AWS stack and want native integration.
+
+6. Layer 4 — Storage (Tiered Options)
+The storage layer holds raw imagery metadata, road network segments, weather observations, and engineered features. Six free-tier options.
+
+Option A — DuckDB + Parquet on S3/R2 (Embedded Analytics)
+Free tier: DuckDB is free and open-source; R2 gives 10 GB free with zero egress; S3 gives 5 GB free (12-month trial)
+Why: DuckDB is an in-process analytical database that runs anywhere — Lambda, GitHub Actions, a laptop. Parquet files on object storage form a serverless data lake. No database server to manage.
+Use when: You want maximum simplicity and zero database infrastructure.
+
+Option B — MotherDuck (Cloud DuckDB)
+Free tier: ~10 GB storage, 10 compute units/month, 3 users
+Why: Managed cloud DuckDB with sub-second query performance. Connect locally with DuckDB CLI or Python, and MotherDuck handles the cloud storage and compute.
+Use when: You want DuckDB's simplicity with cloud persistence and sharing.
+
+Option C — Databricks Free Edition (Lakehouse)
+Free tier: No credit card, no fixed expiry, full lakehouse workspace, Delta Lake, Unity Catalog, MLflow, serverless GPUs
+Why: Full lakehouse with ACID transactions (Delta Lake), built-in MLflow for experiment tracking, and native support for geospatial libraries. This is the strongest "modern data platform" narrative.
+Use when: You want to demonstrate lakehouse architecture and integrate MLflow natively.
+
+Option D — Google BigQuery (Data Warehouse)
+Free tier: 1 TB queries/month, 10 GB storage (permanent)
+Why: Petabyte-scale analytics engine. BigQuery GIS supports geospatial functions natively. BigQuery ML enables in-warehouse survival modelling if you want to avoid Python entirely.
+Use when: You want a pure SQL analytics narrative with geospatial support.
+
+Option E — Supabase Postgres (Operational + Analytical)
+Free tier: 500 MB Postgres, built-in auth, storage, realtime
+Why: PostgreSQL with PostGIS for geospatial queries. Supabase's realtime subscriptions can power a live dashboard. Best choice if you want an operational database alongside the analytical layer.
+Use when: You need transactional writes (citizen reports, user submissions) alongside analytical queries.
+
+Option F — Turso (Edge SQLite) + Cloudflare R2
+Free tier: 9 GB storage across 500 databases (Turso), 10 GB storage with zero egress (R2)
+Why: SQLite at the edge with sub-millisecond reads. R2 for Parquet files. The lightest possible stack for a read-heavy dashboard.
+Use when: You want edge-native low-latency serving with no cold starts.
+
+7. Layer 5 — Transformation (Tiered Options)
+The transformation layer cleans, joins, and reshapes raw data into analytics-ready tables. Four free-tier options.
+
+Option A — dbt Cloud Developer Plan
+Free tier: 1 developer seat, 3,000 models/month, browser-based IDE
+Why: Industry-standard transformation framework. SQL-based models with lineage, testing, and documentation built in. The Developer plan is free forever.
+Use when: You want the standard modern data stack narrative with SQL transformations.
+
+Option B — dbt Core (Open-Source, Self-Hosted)
+Free tier: Fully open-source CLI
+Why: Same transformation engine as dbt Cloud, but runs anywhere — GitHub Actions, Lambda, or a local machine. No vendor dependency.
+Use when: You want the dbt framework without a managed service.
+
+Option C — SQLMesh (Open-Source)
+Free tier: Open-source
+Why: Next-generation transformation framework with column-level lineage, virtual data environments, and automatic change detection. Designed as a dbt alternative with stronger correctness guarantees.
+Use when: You want to demonstrate awareness of the post-dbt transformation landscape.
+
+Option D — Dataform (Google Cloud)
+Free tier: Free within BigQuery free tier
+Why: SQL-based transformation inside BigQuery. If you choose BigQuery for storage, Dataform keeps everything in one platform.
+Use when: You are committed to BigQuery and want native transformation.
+
+Option E — Notebook-Native Transformation (Jupyter / Hex / Deepnote)
+Free tier: Hex Community (free), Deepnote (free tier), Jupyter (free, open-source)
+Why: For a prototype, transformations can live in notebooks. Hex and Deepnote add version control, scheduling, and app publishing. This is faster for exploratory work than a formal dbt project.
+Use when: You want speed of iteration over production-grade transformation infrastructure.
+
+8. Layer 6 — Feature Engineering (Tiered Options)
+The feature engineering layer computes 24-month rolling features per road segment. Five free-tier options.
+
+Option A — Hopsworks Community Edition (Feature Store)
+Free tier: Free forever for personal and small-scale development, no credit card
+Why: Open-source feature store with a managed free tier. Provides feature versioning, online/offline consistency, and a feature registry. Demonstrates MLOps maturity.
+Use when: You want to demonstrate feature store architecture.
+
+Option B — Feast (Open-Source Feature Store)
+Free tier: Fully open-source, Apache 2.0
+Why: The original open-source feature store. Define features in Python, serve them from Parquet or a database. Self-hosted with no vendor dependency.
+Use when: You want feature store concepts without a managed service.
+
+Option C — AWS SageMaker Feature Store (Free Tier)
+Free tier: Available within AWS Free Tier limits
+Why: Managed feature store with online and offline stores. Integrated with SageMaker training and inference.
+Use when: You are committed to the AWS ML stack.
+
+Option D — DuckDB + Parquet (Zero-Infrastructure)
+Free tier: DuckDB free, R2/S3 free tier for storage
+Why: Features are computed as SQL views over Parquet files. No feature store infrastructure, no server, no cost. The "feature store" is a directory of Parquet files with a schema registry table.
+Use when: You want maximum simplicity and cost discipline.
+
+Option E — Databricks Feature Engineering (Unity Catalog)
+Free tier: Included in Databricks Free Edition
+Why: Feature tables managed in Unity Catalog with automatic lineage, versioning, and training/serving consistency. Native integration with MLflow.
+Use when: You chose Databricks for storage and want everything in one platform.
+
+9. Layer 7 — Survival Modelling (Deep Tool Survey)
+This is the heart of the project. The tooling landscape for survival analysis has expanded significantly. Below is a comprehensive survey of free and open-source options, organised by model family.
+
+9.1 Python Survival Analysis Libraries
+Library	Models Supported	Strengths	Limitations
+lifelines	Cox PH, Cox Time-Varying, AFT (Weibull, Log-Normal, Log-Logistic), Kaplan-Meier, Nelson-Aalen	Complete, pure Python, excellent documentation, built-in diagnostics (Schoenfeld residuals, proportional hazards tests)	No ML models; slower on large datasets
+scikit-survival	Cox PH, Coxnet (elastic net), Random Survival Forest, Gradient Boosting Survival Analysis, Survival SVM	Built on scikit-learn — integrates with Pipelines, GridSearchCV, cross-validation	Requires scikit-learn conventions; steeper learning curve
+PySurvival	10+ models: Cox PH, Cox Time-Varying, AFT, Random Survival Forest, Gradient Boosting, Neural Multi-Task Logistic Regression	Wide model coverage, good documentation, tools for model building and cross-validation	Less actively maintained than lifelines and scikit-survival
+pycox	DeepSurv, DeepHit, Cox-Time, PC-Hazard, MTLR	Deep learning survival models with PyTorch backend	Requires PyTorch; more complex setup
+SurvivalEVAL	Evaluation metrics for survival models	Comprehensive evaluation framework: concordance, IBS, time-dependent AUC, calibration	Evaluation only — requires a model from another library
+p-BART	Bayesian Additive Regression Trees for survival	Flexible, non-linear, handles interactions automatically	Bayesian — slower training, less familiar to most teams
+9.2 R Survival Analysis Packages
+Package	Purpose	Strengths
+survival	Core survival analysis: Surv objects, Kaplan-Meier, Cox models, AFT	The reference implementation for survival analysis. CRAN standard.
+timereg	Flexible regression models for survival data	Time-varying effects, additive hazards models, martingale residuals
+mets	Multivariate event times	Competing risks (Fine-Gray), recurrent events, multi-state models
+discSurv	Discrete-time survival analysis	Data transformations, estimation, evaluation, simulation
+reda	Recurrent event data analysis	Recurrent event modelling with multi-state models
+eventglm	Regression for event history outcomes	Marginal estimands: cumulative incidence, restricted mean survival
+9.3 Model Family Comparison
+Model Family	Library	When to Use	RoadSense Fit
+Cox Proportional Hazards	lifelines, scikit-survival, R survival	Baseline model. Interpretable hazard ratios. Works when proportional hazards assumption holds.	✅ Strong baseline
+Cox with Elastic Net	scikit-survival (Coxnet)	High-dimensional features (many spectral bands, weather lags). Automatic feature selection.	✅ Good for feature selection
+Random Survival Forest	scikit-survival, PySurvival	Non-linear relationships, complex interactions. No proportional hazards assumption.	✅ Strong candidate
+Gradient Boosting Survival	scikit-survival (GBSA)	Best performance on tabular data. Handles non-linearity and interactions.	✅ Likely best performer
+DeepSurv	pycox	Neural network extension of Cox PH. Captures complex non-linear patterns.	⚠️ Overkill for tabular data; consider if features exceed 100
+DeepHit	pycox	Directly models the distribution of survival times. Competes with Cox-based models on discriminative performance.	⚠️ Research-grade; less interpretable
+BART-Survival	p-BART	Bayesian non-parametric. Handles uncertainty well.	⚠️ Slower; useful for uncertainty quantification
+9.4 Recommended Modelling Strategy
+Phase 1 — Baseline: Fit a Cox Proportional Hazards model with lifelines. Test proportional hazards assumption using Schoenfeld residuals. Report concordance index and hazard ratios.
+
+Phase 2 — Regularised: Fit a Cox model with elastic net penalty using scikit-survival's Coxnet. Use cross-validation to tune the penalty. This handles feature selection automatically.
+
+Phase 3 — Non-Linear: Fit a Random Survival Forest and a Gradient Boosting Survival model using scikit-survival. Compare concordance index against the Cox baseline. Expect a 3–8% improvement.
+
+Phase 4 — Ensemble: Stack the best Cox, RSF, and GBSA models using a simple weighted average or a meta-learner. Report ensemble performance.
+
+Phase 5 — Uncertainty: Fit a BART-Survival model on the best feature set. Use the posterior distribution to generate confidence intervals on failure probabilities.
+
+Phase 6 — Validation: Evaluate all models on a temporal holdout set (train on 2022–2024, validate on 2025–2026). Report:
+
+Concordance index (C-index)
+
+Integrated Brier Score (IBS)
+
+Time-dependent AUC at 6, 12, and 24 months
+
+Calibration curves (predicted vs. observed failure rates)
+
+Top-decile capture rate (percentage of observed failures in top 10% of predicted-risk segments)
+
+9.5 Experiment Tracking (Tiered Options)
+Tool	Free Tier	Why
+Trackio (Hugging Face)	Free, hosted on HF Spaces	Lightweight, local-first, built for AI agents. Log metrics, compare runs, share results.
+MLflow (Databricks native)	Free within Databricks Free Edition	Industry standard. Model registry, experiment tracking, artefact storage.
+Weights & Biases	Free tier for personal projects	Best-in-class UI, sweep integration, report sharing.
+ClearML	Free hosted tier + self-hosted	Full MLOps suite: tracking, orchestration, model serving.
+Neptune.ai	Free tier for individuals	Focused on experiment tracking with strong comparison features.
+10. Layer 8 — Budget Optimisation
+The optimisation layer takes predicted failure probabilities and repair costs and solves a linear program that maximises expected value preserved subject to a budget constraint. This is a 0/1 knapsack problem.
+
+Free-Tier Options
+Tool	Type	Free Tier	Why
+PuLP	Python linear programming	Open-source	Simple API, CBC solver bundled, handles knapsack naturally
+OR-Tools	Google optimisation suite	Open-source	More powerful than PuLP. Supports CP-SAT, routing, and linear programming.
+scipy.optimize	Scientific computing	Open-source	linprog handles linear programs; milp handles mixed-integer problems
+CVXPY	Convex optimisation	Open-source	Expressive modelling language. Solver-agnostic.
+Google Sheets Solver	Spreadsheet optimisation	Free	For a prototype, a spreadsheet solver demonstrates the concept without code
+Optimisation Workflow
+Input: Predicted failure probability per segment, repair cost per segment, traffic volume × length as value proxy.
+
+Formulate: Maximise total expected value preserved subject to total cost ≤ budget.
+
+Solve: Use PuLP or OR-Tools to find the optimal subset.
+
+Compare: Report the optimiser's allocation vs. uniform allocation. Calculate the improvement multiplier.
+
+Sensitivity: Run the optimiser across a range of budgets (₦10B, ₦25B, ₦50B, ₦100B) and report the marginal value of each additional naira.
+
+Output Metrics
+Metric	Description
+Selected segments	List of segment IDs with predicted risk and repair cost
+Total cost	Sum of repair costs for selected segments
+Expected value preserved	Sum of (failure probability × value) for selected segments
+Improvement multiplier	Value preserved by optimiser ÷ value preserved by uniform allocation
+Marginal value of budget	How much additional value is preserved per additional ₦1B
+11. Layer 9 — Serving & Observability
+11.1 API Layer (Tiered Options)
+Option	Free Tier	Why
+AWS API Gateway + Lambda	1M calls/month (12-month trial on new accounts)	Native AWS integration, usage plans, API keys
+Cloudflare Workers	100K requests/day (permanent)	Edge-native, zero cold starts, no API Gateway cost
+Supabase PostgREST	Unlimited (permanent)	Auto-generated REST API from Postgres tables
+FastAPI on Vercel	100 GB bandwidth (permanent)	Python-native, automatic OpenAPI docs
+Hono on Cloudflare Workers	100K requests/day (permanent)	Ultra-lightweight API framework for edge
+11.2 Dashboard (Tiered Options)
+Option	Free Tier	Why
+MapLibre GL + React on CloudFront + S3	CloudFront Always Free (1 TB transfer)	Vector tiles, smooth zoom, open-source
+Leaflet + React on Vercel	100 GB bandwidth	Simpler than MapLibre, huge plugin ecosystem
+GeoLibre	Free, open-source	Cloud-native GIS platform that runs in browser, desktop, mobile, and Jupyter
+Looker Studio	Free	No-code dashboarding with Google Maps integration
+Grafana	10K metrics series, 50 GB logs (free tier)	Best for operational dashboards alongside the map
+Streamlit Community Cloud	Free for public apps	Python-native dashboards without frontend code
+11.3 Observability (Tiered Options)
+Tool	Free Tier	Why
+Grafana Cloud	10K Prometheus metrics, 50 GB logs, 50 GB traces, 50 GB profiles, 3 users, 14-day retention	Most generous hosted observability free tier. All signal types in one platform.
+AWS CloudWatch	5 GB logs + basic metrics (Always Free)	Native AWS monitoring. Alarms, dashboards, log insights.
+Sentry	5K errors/month	Application error tracking
+PostHog	1M events/month	Product analytics and session replay
+Better Stack	1 GB logs	Log management with alerting
+11.4 Infrastructure as Code (Tiered Options)
+Tool	Free Tier	Why
+Terraform CLI	Open-source, free	Industry standard. HCL syntax. Providers for every cloud.
+OpenTofu	Open-source, free	Terraform fork under Linux Foundation. Fully open-source. No BSL licence concerns.
+Pulumi Individual	Free for 1 user, unlimited projects, 500 deployment min/month, 25 secrets	Real programming languages (Python, TypeScript, Go). Better for complex infrastructure.
+AWS CDK	Open-source, free	Define infrastructure in Python or TypeScript. Synthesises to CloudFormation.
+SST	Open-source, free	Full-stack serverless framework built on CDK. Great for Lambda + API Gateway projects.
+12. End-to-End Workflow
+Stage 1 — Weekly Satellite Ingestion
+Satellite imagery is pulled from Copernicus Data Space Ecosystem via the STAC API. Only the Red and NIR bands are read for a 100m buffer around each road segment using cloud-optimised GeoTIFF range requests. NDVI and NDBI are computed per segment per observation. Results are written to the storage layer.
+
+Stage 2 — Weekly Weather Ingestion
+Open-Meteo Historical API is queried once per 1° × 1° grid cell (approximately 150 cells covering Nigeria). Daily rainfall, temperature extremes, and soil moisture are retrieved for the past 7 days and appended to the weather time series.
+
+Stage 3 — Monthly Road Network Refresh
+GRID3 NGA Roads FeatureServer is queried per spatial tile for motorway, trunk, primary, and secondary roads. Each segment is written with geometry, class, surface, speed estimate, and geohash. The full refresh covers approximately 150,000–200,000 segments.
+
+Stage 4 — Monthly Label Extraction
+FERMA project completion records are scraped from the procurement portal, Federal Ministry of Information press releases, and news archives. Road names are fuzzy-matched against GRID3 segments and written as failure events with completion dates and event types.
+
+Stage 5 — Weekly Feature Engineering
+For each road segment, the system computes 24-month rolling features: NDVI mean/trend/variance, NDBI mean/trend/variance, cumulative rainfall, max 7-day rainfall, dry spell count, temperature range, soil moisture saturation events, road class, surface type, segment length, speed estimate, settlement proximity, and time since last FERMA intervention. Features are written to the feature store and exported to Parquet.
+
+Stage 6 — Weekly Model Training
+The training pipeline runs on GitHub Actions (2,000 free minutes/month). It pulls the latest features and labels, fits multiple survival models (Cox PH, Coxnet, RSF, GBSA, BART-Survival), evaluates each on a temporal holdout set, and selects the best performer by concordance index. The model is serialised and a model card is written with C-index, calibration metrics, and top hazard ratios.
+
+Stage 7 — Weekly Optimisation
+Predicted failure probabilities and repair costs are fed into a linear program. The optimiser selects the subset of segments that maximises expected value preserved subject to the annual budget. Results are written to the serving layer.
+
+Stage 8 — Continuous Serving
+The dashboard displays a risk heatmap of federal roads, ranked by predicted failure probability. Users can click a segment to see its NDVI trend, rainfall history, and predicted survival curve. A budget simulator lets users adjust the budget and see live updates of selected segments and expected value preserved.
+
+13. Free Tier Budget Summary
+Layer	Primary Tool	Free Tier	Permanent?
+Satellite data	Copernicus CDSE	Free, open	✅
+Weather data	Open-Meteo	10,000 calls/day	✅
+Road network	GRID3 FeatureServer	Free, no auth	✅
+Ingestion	GitHub Actions	2,000 min/month	✅
+Orchestration	Prefect Cloud	100K runs/month	✅
+Storage	DuckDB + R2	10 GB, zero egress	✅
+Transformation	dbt Cloud Developer	3,000 models/month	✅
+Feature store	Hopsworks Community	Free forever	✅
+Modelling	lifelines + scikit-survival	Open-source	✅
+Experiment tracking	Trackio / MLflow	Free	✅
+Optimisation	PuLP / OR-Tools	Open-source	✅
+API	Cloudflare Workers	100K req/day	✅
+Dashboard	MapLibre + CloudFront	1 TB transfer	✅
+Observability	Grafana Cloud	10K metrics, 50 GB logs	✅
+IaC	OpenTofu	Open-source	✅
+Total recurring cost: $0.00/month.
+
+14. Risks & Mitigations
+Risk	Impact	Mitigation
+Sparse FERMA label data	Model cannot train	Supplement with news reports and procurement records; use censored data
+Fuzzy matching errors	Wrong segments labelled	Confidence threshold + manual review queue
+GRID3 road network gaps	Segments missing	Accept 5–10% gap; document in README
+Sentinel-2 cloud cover	Missing observations	Multi-temporal compositing; cloud masking via L2A
+Cox PH assumption violation	Underestimated risk	Test Schoenfeld residuals; use time-varying covariates or RSF/GBSA
+GitHub Actions minutes exhausted	Pipeline stops	Daily runs take <5 minutes; 2,000 minutes/month is ample
+S3 GET request overrun	Unexpected charges	Use Cloudflare R2 instead; monitor weekly
+Dashboard cold start	Slow UX	Cloudflare Workers have no cold starts
+15. Deliverables Checklist
+□ Architecture diagram (Mermaid or draw.io, committed to repo)
+□ Data dictionary for all tables (road network, observations, features, labels, models)
+□ Feature engineering notebook with 24-month rolling window logic
+□ Survival modelling notebook with all model families compared
+□ Model card with C-index, calibration, hazard ratios, and validation plots
+□ Budget optimisation notebook with example allocation and sensitivity analysis
+□ Live public dashboard URL
+□ Demo walkthrough video (5 minutes)
+□ Cost analysis (projected vs. actual, $0 recurring)
+□ README with quick-start and architecture overview
+16. Positioning Statement
+RoadSense Nigeria is a cloud engineering and data science project that predicts road segment failure using free satellite imagery, open geospatial data, and survival analysis, then optimises maintenance budget allocation across Nigeria's federal road network. It demonstrates remote sensing, feature engineering at scale, survival modelling across seven model families, linear programming, modern data orchestration, feature stores, and serverless serving — all running on permanent free tiers at zero recurring cost. The project directly answers the Federal Government's 2026 directive for FERMA to develop a geo-referenced national database of failed roads, and goes further by predicting which roads will fail next and where every naira should be spent.
+

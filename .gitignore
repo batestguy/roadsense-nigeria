@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Data — never commit raw or intermediate data, it lives in Hugging Face Datasets
+data/
+!.gitkeep
+
+# Tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+mlruns/
+mlflow.db
+.feast/
+
+# Agent tooling — not part of the product
+.agents/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

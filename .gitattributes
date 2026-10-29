@@ -1,0 +1,12 @@
+# Normalise to LF in the repository. Without this, a Windows checkout commits CRLF and the Linux
+# CI workflows receive files that differ from what was tested locally.
+* text=auto eol=lf
+
+# Binary formats must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.gif binary
+*.parquet binary
+*.gz binary
+*.tar.gz binary
+*.tif binary

@@ -1,0 +1,65 @@
+name: Pipeline
+
+# The derived tables are rebuilt from their sources rather than from a laptop, so the published
+# dataset always matches a commit that can be re-run. Nothing here costs money: public repos get
+# free standard runners, GRID3 and OCDS are anonymous, and Hugging Face reads are free.
+on:
+  workflow_dispatch:
+  schedule:
+    # First of the month, 04:00 UTC. The procurement record gains rows monthly; the road
+    # network itself changes rarely, but re-running costs nothing but a few minutes.
+    - cron: "0 4 1 * *"
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -e ".[dev,publish]"
+
+      - name: Fetch sources and run Gate G0 matcher
+        run: python scripts/run_gate0.py
+
+      - name: Build corridor table
+        run: python scripts/build_corridors.py
+
+      - name: Build corridor geometry
+        run: python scripts/build_geometry.py
+
+      - name: Package dataset
+        run: python scripts/publish_dataset.py
+
+      # Only fails if the secret is missing, which is deliberate: a silently skipped publish
+      # looks identical to a successful one in the Actions UI.
+      - name: Publish to Hugging Face
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "::error::HF_TOKEN secret is not set; cannot publish the dataset."
+            exit 1
+          fi
+          python scripts/publish_dataset.py --upload
+
+      - name: Upload build outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: derived-tables
+          path: |
+            dist/dataset/*.parquet
+            data/interim/corridors.geojson
+          if-no-files-found: error
+          retention-days: 30
