@@ -22,9 +22,9 @@ on:
         type: string
         default: "2026-06"
       shards:
-        description: "Number of parallel shards (48 keeps each job under ~4 h at 10 m)"
+        description: "Parallel shards. 96 at 10 m; 48 risks the 6 h job limit."
         type: number
-        default: 48
+        default: 96
       limit_tiles:
         description: "Tiles per shard; 0 means all. For a smoke run set shards=1 and this to 3."
         type: number
@@ -82,12 +82,19 @@ jobs:
   backfill:
     needs: prepare
     runs-on: ubuntu-latest
-    # 10 m is ~30 s per tile-month in the worst measured case; a shard of 42 tiles x 22 months needs
-    # headroom, and GitHub's hard limit for a job is 6 h.
+    # Runtime arithmetic, so the shard count is a calculation rather than a guess:
+    #   2,016 tiles x 24 months = 48,384 tile-months
+    #   measured 10-30 s each  => 134-403 h serial
+    #   96 shards            => 2.1-4.2 h per shard, comfortably under the 6 h job limit
+    #   48 shards            => 4.2-8.4 h per shard, which can exceed it
+    # GitHub also caps concurrent jobs (about 20 on the free plan), so 96 shards run in roughly
+    # five waves: expect 12-20 h wall clock for the national run, not 4.
     timeout-minutes: 350
     strategy:
       fail-fast: false
-      max-parallel: 48
+      # Matches the free plan's concurrency cap; a higher number only queues. Shards waiting in the
+      # queue are not a failure — the workflow's own timeout does not count queue time.
+      max-parallel: 20
       matrix:
         shard: ${{ fromJSON(needs.prepare.outputs.shards) }}
 

@@ -94,8 +94,10 @@ workflow fails loudly rather than skipping silently if it is absent.
 - ✅ **Backfill runner** (`scripts/backfill.py`): strided shard split, per-shard parquet, resumes by
   skipping `(tile, month)` pairs it already holds, retries transient S3 timeouts. Smoke-tested
   including a resume that correctly wrote zero rows.
-- ✅ **Sharded workflow** (`.github/workflows/backfill.yml`): prepare → 48 parallel shards → merge
-  with a duplicate check that fails the run if shards overlap.
+- ✅ **Sharded workflow** (`.github/workflows/backfill.yml`): prepare → N parallel shards → merge
+  with a duplicate check that fails the run if shards overlap. **Smoke-tested on a runner
+  2026-10-29** (run 40820091470): all three jobs green, merged artifact read back and inspected.
+  Default is 96 shards — 48 allows 4.2–8.4 h per job against a 6 h limit.
 - ⬜ Weather from Open-Meteo per 1° cell.
 - ⬜ The actual national run — it is manual, because it streams ~70 GB and takes hours.
 - ✅ **Feature redesign from F17** — `rings()` samples an undilated centreline plus a 50–150 m
@@ -108,13 +110,17 @@ workflow fails loudly rather than skipping silently if it is absent.
   31 GB / 144 h the 40 m run implied. The backfill must be sharded either way.
 
 **Exit criterion:** pilot features for one state; measured bytes/requests recorded in
-`docs/findings.md` replacing the 6,000-tile estimate (closes O2). **Met** on imagery; weather and
-the sharded backfill remain, and the backfill plan depends on the F17 runtime (the bytes are stable, the runtime is not).
+`docs/findings.md` replacing the 6,000-tile estimate (closes O2). **Met**, and the backfill runner
+is built and smoke-tested on a runner. Remaining: weather ingest, and executing the national run
+itself.
 
 **Resolution decision — made, not deferred (F19):** run the condition signal at **10 m**. The
 ablation showed 40 m preserves levels (ρ=0.937) and change (ρ=0.917) but flips the sign of the
-contrast on 20.6% of corridor-months, and sign is the feature's meaning. Cost is ~70 GB and
-~281 h serial; the workflow shards it 48 ways.
+contrast on 20.6% of corridor-months, and sign is the feature's meaning.
+
+**National run budget:** 48,384 tile-months × 10–30 s = **134–403 h serial**, so **12–20 h wall clock
+at 96 shards** (~20 concurrent jobs, ~5 waves) and **~89 GB streamed, nothing stored**. See
+`docs/handoff.md` for the arithmetic.
 
 ---
 

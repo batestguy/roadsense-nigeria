@@ -3,7 +3,9 @@
 A degradation index and maintenance-allocation study for Nigeria's federal highway network, built
 entirely from open data at zero recurring cost.
 
-> **Status: re-scoped after Gate G0; Phases 2 complete, Phase 3 pilot measured.**
+> **Status: re-scoped after Gate G0; Phases 0–2 complete, Phase 3 built and smoke-tested on CI.
+> The national imagery run (~89 GB, 12–20 h) has not been executed yet.** Pick up from
+> [`docs/handoff.md`](docs/handoff.md).
 > The label-matching gate returned **181 high-confidence matches** against a 300 threshold. The
 > cause is a data limit rather than a code defect: GRID3 gives names to 869 corridors and leaves
 > 113,004 highway segments unnamed, so most procurement records cannot be joined to the network.
@@ -45,7 +47,10 @@ which corridors are deteriorating fastest, or where a fixed budget buys the most
 | `scripts/backfill.py` | Sharded, resumable national imagery backfill |
 | `tests/` | 64 tests over matching, states, corridors, geometry, imagery, dataset access, warehouse |
 | `docs/findings.md` | Every measured finding, with dates, sources and what changed as a result |
+| `docs/handoff.md` | **Start here** — state, runtime, credentials, decisions, traps |
 | `docs/phases.md` | Build phases, dependencies and current status |
+| `docs/pilot-report.md` | Generated imagery pilot measurements |
+| `docs/resolution-ablation.md` | Generated 10 m vs 40 m comparison |
 | `preflight-spec.md` | Agreed scope, thresholds and decisions |
 
 ## Quickstart

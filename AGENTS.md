@@ -8,6 +8,7 @@ Gate G0 showed the label join cannot support segment-level work (findings F11–
 
 | File | Why |
 |---|---|
+| `docs/handoff.md` | **Start here.** Current state, runtime expectations, credentials, decisions already made, traps. |
 | `preflight-spec.md` | Agreed plan, thresholds and decisions. Supersedes the original proposal where they conflict. |
 | `docs/findings.md` | Every measured fact. Do not re-derive these; do re-verify if a source misbehaves. |
 | `docs/phases.md` | Current phase, what is done, what is blocked. |
@@ -27,7 +28,16 @@ python scripts/build_corridors.py           # -> data/interim/corridors.csv (869
 python scripts/build_geometry.py            # -> data/interim/corridors.geojson
 python scripts/publish_dataset.py           # -> dist/dataset/*.parquet + dataset card
 python scripts/check_warehouse.py           # DuckDB views + headline counts
+
+# Imagery (needs .[geo])
+python scripts/count_tiles.py               # 2,016 tiles, no download
+python scripts/sample_pilot.py              # one-state pilot, measures real bytes
+python scripts/ablate_resolution.py         # 10 m vs 40 m -> docs/resolution-ablation.md
+python scripts/backfill.py --shard 1/96 --dry-run
 ```
+
+National backfill: `gh workflow run backfill.yml -f resolution=10 -f shards=96`. Expect **12–20 h
+wall clock and ~89 GB streamed**, not stored. 48 shards risks the 6 h job limit; 96 is the default.
 
 Optional extras, by phase: `.[geo]` (rasterio, shapely, pyproj), `.[model]`
 (scikit-survival, lifelines, mlflow), `.[optimise]` (pulp), `.[platform]` (feast, dagster).
