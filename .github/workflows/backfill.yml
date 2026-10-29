@@ -1,0 +1,177 @@
+name: Imagery backfill
+
+# Manual only. A national 10 m backfill streams ~70 GB and takes hours across many runners; that is
+# not something to trigger on a schedule by accident.
+#
+# Cost: zero. Public repositories get free standard runners, and the Digital Earth Africa bucket is
+# anonymous with no requester-pays flag.
+on:
+  workflow_dispatch:
+    inputs:
+      resolution:
+        description: "Analysis resolution in metres (10 = condition signal, 40 = landscape index)"
+        type: choice
+        options: ["10", "40"]
+        default: "10"
+      start:
+        description: "First month, YYYY-MM"
+        type: string
+        default: "2024-09"
+      end:
+        description: "Last month, YYYY-MM"
+        type: string
+        default: "2026-06"
+      shards:
+        description: "Number of parallel shards (48 keeps each job under ~4 h at 10 m)"
+        type: number
+        default: 48
+
+concurrency:
+  group: backfill-${{ inputs.resolution }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -e ".[dev,geo]"
+
+      # The corridor cache is gitignored, so it is rebuilt rather than committed. Doing it once here
+      # and passing it to the shards avoids 48 jobs each re-downloading the same 41 MB of geometry.
+      - name: Build corridor cache
+        run: |
+          python scripts/run_gate0.py
+          python scripts/build_corridors.py
+          python scripts/build_geometry.py
+
+      - name: Upload corridor cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: corridor-cache
+          path: |
+            data/interim/corridors.csv
+            data/interim/corridor_paths.json.gz
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Plan shards
+        id: plan
+        run: |
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, os
+          total = int(os.environ["TOTAL_SHARDS"])
+          print(f"shards={json.dumps(list(range(1, total + 1)))}")
+          PY
+        env:
+          TOTAL_SHARDS: ${{ inputs.shards }}
+
+  backfill:
+    needs: prepare
+    runs-on: ubuntu-latest
+    # 10 m is ~30 s per tile-month in the worst measured case; a shard of 42 tiles x 22 months needs
+    # headroom, and GitHub's hard limit for a job is 6 h.
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      max-parallel: 48
+      matrix:
+        shard: ${{ fromJSON(needs.prepare.outputs.shards) }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -e ".[dev,geo]"
+
+      - name: Restore corridor cache
+        uses: actions/download-artifact@v4
+        with:
+          name: corridor-cache
+          path: data/interim
+
+      - name: Sample shard
+        run: |
+          python scripts/backfill.py \
+            --shard ${{ matrix.shard }}/${{ inputs.shards }} \
+            --resolution ${{ inputs.resolution }} \
+            --start ${{ inputs.start }} \
+            --end ${{ inputs.end }}
+
+      - name: Upload shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: backfill-r${{ inputs.resolution }}-shard-${{ matrix.shard }}
+          path: |
+            data/features/imagery_r*.parquet
+            data/features/backfill_state_r*.json
+          if-no-files-found: error
+          retention-days: 7
+
+  merge:
+    needs: backfill
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: Collect shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: backfill-r${{ inputs.resolution }}-shard-*
+          path: data/features
+          merge-multiple: true
+
+      - name: Merge and check
+        run: |
+          python - <<'PY'
+          import glob
+          import pandas as pd
+
+          files = sorted(glob.glob("data/features/imagery_r*.parquet"))
+          if not files:
+              raise SystemExit("no shard parquets found")
+          frame = pd.concat([pd.read_parquet(path) for path in files], ignore_index=True)
+          frame.to_parquet(f"data/features/imagery_r${{ inputs.resolution }}.parquet", index=False)
+
+          print(f"merged {len(files)} shards -> {len(frame):,} rows")
+          print(f"corridors  {frame['corridor_id'].nunique():,}")
+          print(f"tiles      {frame.groupby(['tile_x', 'tile_y']).ngroups:,}")
+          print(f"months     {frame['month'].nunique():,}")
+          print(f"date range {frame['month'].min()} .. {frame['month'].max()}")
+          print(f"contrast   mean {frame['ndvi_contrast'].mean():+.4f}  "
+                f"non-null {frame['ndvi_contrast'].notna().mean():.1%}")
+          duplicate = frame.duplicated(["corridor_id", "tile_x", "tile_y", "month"]).sum()
+          print(f"duplicates {duplicate:,}")
+          if duplicate:
+              raise SystemExit("shards overlap; check the strided split")
+          PY
+
+      - name: Upload merged features
+        uses: actions/upload-artifact@v4
+        with:
+          name: imagery-r${{ inputs.resolution }}
+          path: data/features/imagery_r${{ inputs.resolution }}.parquet
+          if-no-files-found: error
+          retention-days: 90

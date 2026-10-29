@@ -22,6 +22,7 @@ assumptions that have already been shown to be false.
 | F14 | All 869 corridors have geometry; 2.74 MB raw, 0.64 MB gzipped | The national map needs no vector-tile pipeline |
 | F16 | The "20 m is 10× cheaper" plan was wrong by ~9×; 20 m costs 857 KB per 8 km tile vs 934 KB at 10 m | Sampler defaults to 40 m; national backfill is ~31 GB, not 13 |
 | F17 | Centreline NDVI on a road is ≈ 0 — it measures asphalt | Phase 4 needs a road-versus-verge contrast, not a centreline band |
+| F19 | The contrast feature is trustworthy at 10 m but flips sign on 1 in 5 corridor-months at 40 m | The condition signal must run at 10 m (~70 GB), while a landscape index can run at 40 m (31 GB) |
 
 ---
 
@@ -515,13 +516,51 @@ tile-counting rather than bbox-area arithmetic is the only honest way to size th
 
 ---
 
+## F19 — The contrast feature works, but only at 10 m
+
+Measured 2026-10-29 via `scripts/ablate_resolution.py` (3 tiles, 3 months, Lagos, 306 corridor-month
+pairs) after fixing a design defect described below.
+
+| Metric | Value | Threshold | Result |
+|---|---:|---:|---|
+| Level rank correlation (10 m vs 40 m) | 0.937 | ≥ 0.80 | ✅ |
+| Change rank correlation | 0.917 | ≥ 0.60 | ✅ |
+| Contrast rank correlation | 0.793 | ≥ 0.60 | ✅ |
+| **Contrast sign agreement** | **79.4%** | ≥ 80% | ❌ |
+| Mean absolute NDVI gap | 0.0355 | — | — |
+| Bias (40 m − 10 m) | +0.0307 | — | — |
+
+**Verdict: 40 m is fine for a level index and for month-to-month change, but not for the contrast
+feature.** One corridor-month in five flips the sign of `verge − core` between resolutions — and
+the sign is the whole point of that feature. The condition signal has to run at 10 m.
+
+That reverses the cost recommendation for Phase 4 while leaving O3's original answer intact: the
+question was never really "which resolution is cheapest" but "which resolution preserves what".
+40 m preserves the landscape index (31 GB). 10 m is needed for the road signal (~70 GB).
+
+### A measurement artefact worth recording
+
+The first implementation of the two-band design dilated the centreline into a 50 m "inner band"
+and called that the road. At 40 m, 50 m of dilation is **one pixel**, so the "road" band already
+spanned ±40 m and sampled the verge it was supposed to be compared against. The result was a
+contrast that came back **negative on every corridor** (−0.17 to −0.07) and looked like a
+discovery about Lagos.
+
+It was an artefact. With an undilated centreline the same tiles give positive contrast on most
+corridors (+0.008 to +0.023 at 10 m), with carriageway NDVI of 0.03–0.12 — asphalt, as expected.
+
+The lesson generalises: at a 40 m pixel, **any** band narrower than ~80 m cannot be separated from
+its surroundings. Dilating a mask is not free geometry; it changes what the mask means.
+
+---
+
 ## F10 — Findings that are still open
 
 | # | Open question | How it gets closed |
 |---|---|---|
 | O1 | ~~What fraction of the 3,233 labels match a named segment at high confidence?~~ | **Closed** — 181/1,672 high-confidence, 66 corridors (F11) |
 | O2 | ~~How many distinct 8 km tiles actually contain highway?~~ | **Closed** — 2,016 tiles across 97 items (F18) |
-| O3 | Does 40 m NDVI rank corridors the same as 10 m? | Ablation in Phase 4, now that both are measured at 1.00× and 0.41× the cost |
-| O6 | Does a road-minus-verge contrast beat centreline NDVI? | Phase 4 feature design (see F17) |
+| O3 | ~~Does 40 m NDVI rank corridors the same as 10 m?~~ | **Closed** — levels ρ=0.937, change ρ=0.917, contrast ρ=0.793 but sign agreement 79.4% (F19) |
+| O6 | ~~Does a road-minus-verge contrast beat centreline NDVI?~~ | **Closed** — it is measurable and signed correctly at 10 m; whether it predicts condition needs labels (F19) |
 | O4 | Are the 2024-heavy labels a budget artefact or a genuine deterioration signal? | Year fixed effects + a stated limitation; cannot be fully resolved |
 | O5 | Does Hugging Face Datasets serve Parquet efficiently enough for DuckDB `httpfs`? | **Partly closed** — anonymous range reads return 206 (F15); throughput still to be measured once a real file is uploaded |

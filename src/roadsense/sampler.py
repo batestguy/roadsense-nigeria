@@ -21,6 +21,7 @@ say so.
 from __future__ import annotations
 
 import json
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -142,23 +143,32 @@ def _next_body(payload: dict) -> dict | None:
     return None
 
 
-def _post_json(url: str, body: dict) -> dict[str, Any]:
-    """POST JSON and return the parsed response."""
+def _post_json(url: str, body: dict, *, attempts: int = 3) -> dict[str, Any]:
+    """POST JSON and return the parsed response, retrying transient failures."""
     import urllib.request
 
     data = json.dumps(body).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=data,
-        headers={
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "User-Agent": "roadsense-ng/0.1 (+research project)",
-        },
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=90) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    last_error: Exception | None = None
+
+    for attempt in range(attempts):
+        req = urllib.request.Request(
+            url,
+            data=data,
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "roadsense-ng/0.1 (+research project)",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as exc:  # noqa: BLE001 - retried below, re-raised after
+            last_error = exc
+            time.sleep(min(2**attempt, 8))
+
+    raise RuntimeError(f"STAC search failed at {url}: {last_error}") from last_error
 
 
 def _to_item(feature: dict) -> Item | None:
@@ -279,14 +289,116 @@ def open_band(url: str, *, resolution: int):
             yield src, float(src.transform.a)
 
 
-def read_tile(item: Item, band: str, tx: int, ty: int, *, resolution: int = ANALYSIS_M) -> np.ndarray:
-    """Read one band of one 8 km tile at the requested resolution."""
+def read_tile(
+    item: Item,
+    band: str,
+    tx: int,
+    ty: int,
+    *,
+    resolution: int = ANALYSIS_M,
+    attempts: int = 3,
+) -> np.ndarray:
+    """Read one band of one 8 km tile at the requested resolution.
+
+    Retries on transient network failures. At national scale a run makes ~145,000 reads, so a
+    once-in-a-thousand timeout is certain to happen; without a retry it would kill an hours-long
+    shard. Backoff is short because the failure mode is a stalled socket, not rate limiting.
+    """
     left, _, _, top = tiles.tile_bounds(tx, ty)
     size = tiles.TILE_M // resolution
+    last_error: Exception | None = None
 
-    with open_band(item.assets[band], resolution=resolution) as (src, res):
-        window = Window((left - src.transform.c) / res, (src.transform.f - top) / res, size, size)
-        return src.read(1, window=window).astype("float32")
+    for attempt in range(attempts):
+        try:
+            with open_band(item.assets[band], resolution=resolution) as (src, res):
+                window = Window(
+                    (left - src.transform.c) / res, (src.transform.f - top) / res, size, size
+                )
+                return src.read(1, window=window).astype("float32")
+        except Exception as exc:  # noqa: BLE001 - retried below, re-raised after
+            last_error = exc
+            time.sleep(min(2**attempt, 8))
+
+    raise RuntimeError(
+        f"failed to read {band} tile ({tx},{ty}) from {item.assets.get(band)}"
+    ) from last_error
+
+
+def _dilate(mask: np.ndarray, steps: int) -> np.ndarray:
+    """Grow a boolean mask by ``steps`` pixels in the four cardinal directions.
+
+    A 3×3 max filter would be more isotropic but costs nine comparisons per pixel; for a ring
+    width of a few pixels on a 200 × 200 tile the difference is invisible and the four-way version
+    is exact enough. Off-tile growth is clipped, which slightly narrows rings at tile edges.
+    """
+    out = mask.copy()
+    for _ in range(max(0, steps)):
+        grown = out.copy()
+        grown[1:, :] |= out[:-1, :]
+        grown[:-1, :] |= out[1:, :]
+        grown[:, 1:] |= out[:, :-1]
+        grown[:, :-1] |= out[:, 1:]
+        out = grown
+    return out
+
+
+def rings(
+    paths: list[list[list[float]]],
+    tx: int,
+    ty: int,
+    *,
+    resolution: int = ANALYSIS_M,
+    core_m: int = 0,
+    verge_inner_m: int = 50,
+    verge_outer_m: int = 150,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Two masks: the carriageway, and a verge band offset from it.
+
+    Why: a pixel on a road centreline is mostly asphalt, so its NDVI is ≈ 0 whether the road is
+    pristine or crumbling (findings F17). What separates a maintained corridor from a failing one
+    is its edges — tidy verge and drainage versus encroaching dust, bare laterite and lost
+    vegetation.
+
+    Returns ``(core, ring)``. ``core`` is the centreline raster itself plus ``core_m`` metres of
+    dilution; ``ring`` is the band between ``verge_inner_m`` and ``verge_outer_m`` from it, with
+    the core's own footprint removed so the two never share a pixel and the contrast is not
+    contaminated by tarmac.
+
+    **An earlier version dilated the core into a 50 m "inner band" and called it the road.** At
+    40 m that dilation is one pixel, which already spans ±40 m — so it sampled the road reserve
+    rather than the carriageway, and the resulting contrast was negative by construction. The
+    default is now an undilated centreline. Diluting it is still possible via ``core_m`` for a
+    reserve-scale comparison, but it is no longer what "road" means.
+    """
+    size = tiles.TILE_M // resolution
+    core = road_mask(paths, tx, ty, resolution=resolution)
+    if not core.any():
+        empty = np.zeros((size, size), dtype=bool)
+        return empty, empty
+
+    if core_m > 0:
+        core = _dilate(core, max(1, round(core_m / resolution)))
+
+    inner_px = max(1, round(verge_inner_m / resolution))
+    outer_px = max(inner_px + 1, round(verge_outer_m / resolution))
+
+    outer = _dilate(core, outer_px)
+    hole = _dilate(core, inner_px)
+    return core, outer & ~hole
+
+
+def contrast(values: dict, ring: dict, key: str = "ndvi_mean") -> float:
+    """Difference between the road band and its verge, in index units.
+
+    Returns NaN when either side has no valid pixels. A positive value means the verge is greener
+    than the carriageway — the normal, healthy case. A corridor where this shrinks towards zero is
+    one where the vegetation beside the road has gone.
+    """
+    road_value = values.get(key, float("nan"))
+    ring_value = ring.get(key, float("nan"))
+    if road_value != road_value or ring_value != ring_value:  # NaN check without numpy warnings
+        return float("nan")
+    return float(ring_value - road_value)
 
 
 def indices(red: np.ndarray, nir: np.ndarray, swir: np.ndarray, mask: np.ndarray) -> dict:

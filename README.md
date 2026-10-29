@@ -24,7 +24,7 @@ which corridors are deteriorating fastest, or where a fixed budget buys the most
 |---|---|---|
 | 1 | Corridor network from GRID3, merged to 869 corridors | ✅ built |
 | 2 | Intervention records from Nigeria's open procurement data | ✅ built |
-| 3 | Cloud-free monthly Sentinel-2 composites from Digital Earth Africa | 🔄 sampler proven, 31 GB national run pending |
+| 3 | Cloud-free monthly Sentinel-2 composites from Digital Earth Africa | 🔄 sampler proven, sharded backfill built, national run pending |
 | 4 | Rainfall and soil moisture from Open-Meteo | ⏳ Phase 3 |
 | 5 | Degradation index across all 869 corridors (no labels needed) | ⏳ Phase 5 |
 | 6 | Budget allocation with a knapsack, and the trade-off reported honestly | ⏳ Phase 6 |
@@ -41,7 +41,9 @@ which corridors are deteriorating fastest, or where a fixed budget buys the most
 | `scripts/check_warehouse.py` | Verifies the DuckDB views and prints headline counts |
 | `scripts/count_tiles.py` | Counts the 8 km imagery tiles that actually contain highway |
 | `scripts/sample_pilot.py` | One-state imagery pilot with exact byte accounting |
-| `tests/` | 59 tests over matching, states, corridors, geometry, imagery, dataset access, warehouse |
+| `scripts/ablate_resolution.py` | 10 m vs 40 m comparison for the condition signal |
+| `scripts/backfill.py` | Sharded, resumable national imagery backfill |
+| `tests/` | 64 tests over matching, states, corridors, geometry, imagery, dataset access, warehouse |
 | `docs/findings.md` | Every measured finding, with dates, sources and what changed as a result |
 | `docs/phases.md` | Build phases, dependencies and current status |
 | `preflight-spec.md` | Agreed scope, thresholds and decisions |
@@ -50,7 +52,7 @@ which corridors are deteriorating fastest, or where a fixed budget buys the most
 
 ```bash
 python -m pip install -e ".[dev]"
-python -m pytest tests -q                       # 59 tests, no network
+python -m pytest tests -q                       # 64 tests, no network
 
 python scripts/run_gate0.py                     # ~65 MB of sources, then matching
 python scripts/build_corridors.py
@@ -60,6 +62,8 @@ python scripts/check_warehouse.py               # DuckDB counts: 869 corridors, 
 
 python scripts/count_tiles.py                   # 2,016 imagery tiles, no download
 python scripts/sample_pilot.py                  # measures real bytes for one state
+python scripts/ablate_resolution.py             # 10 m vs 40 m, writes docs/resolution-ablation.md
+python scripts/backfill.py --shard 1/48 --dry-run   # plan a shard without downloading
 ```
 
 `publish_dataset.py --upload` pushes to Hugging Face and needs `HF_TOKEN`. Reading the dataset
@@ -93,9 +97,11 @@ enable, even on the free tier, so it would break the project's no-card rule (fin
 - Open-Meteo's free tier is **non-commercial use only**.
 - Sampling NDVI on a road centreline gives ≈ 0: a 40 m pixel is mostly asphalt. The signal has to
   be a road-versus-verge contrast, which is a Phase 4 design change (findings F17).
-- The full imagery backfill is **~31–36 GB at 40 m**, with a runtime measured anywhere between 143
-  and 410 hours serial across two runs — so it must be sharded across parallel jobs. The plan's
-  original cost estimate was off by ~9× (findings F16, F17).
+- The road-condition signal needs **10 m** imagery (~70 GB, ~281 h serial), not 40 m: at 40 m the
+  verge contrast flips sign on one corridor-month in five (findings F19). A coarse landscape index
+  would be fine at 40 m, but that is not what the project is for.
+- The plan's original imagery cost estimate was off by ~9×; per-tile bytes are now measured, not
+  inferred (findings F16).
 
 ## Licence
 

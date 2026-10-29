@@ -46,6 +46,9 @@ python scripts/check_warehouse.py        # DuckDB views; prints the headline cou
 
 python scripts/count_tiles.py            # 2,016 imagery tiles containing highway (no download)
 python scripts/sample_pilot.py           # one-state imagery pilot, measures real bytes
+python scripts/ablate_resolution.py      # 10 m vs 40 m -> docs/resolution-ablation.md
+python scripts/backfill.py --shard 1/48 --dry-run    # plan a shard, no downloads
+python scripts/backfill.py --shard 1/48 --limit-tiles 3   # smoke test, ~1 min
 ```
 
 The imagery scripts need `.[geo]` (rasterio, pyproj).
@@ -122,8 +125,14 @@ out of scope. Prefer alternatives that do not require a credit card.
   tile-month at 40 m for 3 bands, 10.7 s each. Backfill ≈ **31 GB / 143 h serial** — must be
   sharded.
 - **Centreline NDVI is useless as a road-condition signal** — a 40 m road pixel is asphalt, so
-  NDVI ≈ 0 regardless of condition (findings F17). Phase 4 must sample a centreline band *and* an
-  outer verge band 50–150 m out, and use the contrast.
+  NDVI ≈ 0 regardless of condition (findings F17). `sampler.rings()` returns an undilated centreline
+  plus a 50–150 m verge band; `sampler.contrast()` is `verge − core`.
+- **Do not dilate the "road" mask.** An early version grew the centreline by 50 m and called that
+  the road; at 40 m that is one pixel, so it sampled the verge it was comparing against and produced
+  negative contrast on every corridor. Dilating changes what a mask means (findings F19).
+- **The condition signal must run at 10 m, not 40 m.** 40 m preserves level (ρ=0.937) and change
+  (ρ=0.917) but flips the contrast sign on 20.6% of corridor-months (findings F19). 10 m costs
+  ~70 GB / ~281 h serial; run it through `.github/workflows/backfill.yml`, never on a laptop.
 - **GRID3 has gaps** — accept 5–10% missing segments and document them rather than fabricating coverage.
 - **Cost traps**: none currently — public repos get unlimited standard-runner Actions minutes, and
   DE Africa's S3 is anonymous with no requester-pays. Watch instead for free-tier *terms* drift, and

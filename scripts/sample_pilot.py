@@ -171,10 +171,15 @@ def main() -> int:
                     per_corridor[name].append(path)
 
                 for name, path_list in per_corridor.items():
-                    mask = sampler.road_mask(path_list, tx, ty, resolution=args.resolution)
-                    if not mask.any():
+                    inner, ring = sampler.rings(
+                        path_list, tx, ty, resolution=args.resolution
+                    )
+                    if not inner.any():
                         continue
-                    values = sampler.indices(bands["B04"], bands["B08"], bands["B11"], mask)
+                    values = sampler.indices(
+                        bands["B04"], bands["B08"], bands["B11"], inner
+                    )
+                    verge = sampler.indices(bands["B04"], bands["B08"], bands["B11"], ring)
                     rows.append(
                         {
                             "corridor_name": name,
@@ -184,6 +189,11 @@ def main() -> int:
                             "resolution_m": args.resolution,
                             "item_id": item.item_id,
                             **values,
+                            "ndvi_verge": verge["ndvi_mean"],
+                            "ndbi_verge": verge["ndbi_mean"],
+                            "ring_pixels_valid": verge["pixels_valid"],
+                            "ndvi_contrast": sampler.contrast(values, verge, "ndvi_mean"),
+                            "ndbi_contrast": sampler.contrast(values, verge, "ndbi_mean"),
                         }
                     )
 
@@ -214,14 +224,22 @@ def main() -> int:
     print(f"  {'serial runtime projection':30s} {2_016 * 24 * elapsed / max(tile_months, 1) / 3600:.0f} h")
 
     if not frame.empty:
-        print("\n  NDVI/NDBI by corridor:")
+        print("\n  road band vs verge band by corridor:")
         summary = (
             frame.groupby("corridor_name")
-            .agg(months=("month", "nunique"), ndvi=("ndvi_mean", "mean"), ndbi=("ndbi_mean", "mean"))
-            .sort_values("ndvi")
+            .agg(
+                months=("month", "nunique"),
+                road=("ndvi_mean", "mean"),
+                verge=("ndvi_verge", "mean"),
+                contrast=("ndvi_contrast", "mean"),
+            )
+            .sort_values("contrast")
         )
-        for name, row in summary.head(8).iterrows():
-            print(f"    {name[:42]:42s} n={row.months:2.0f}  NDVI={row.ndvi:5.3f}  NDBI={row.ndbi:5.3f}")
+        for name, row in summary.head(10).iterrows():
+            print(
+                f"    {name[:38]:38s} n={row.months:2.0f}  road={row.road:6.3f}  "
+                f"verge={row.verge:6.3f}  contrast={row.contrast:+.3f}"
+            )
 
     REPORT.write_text(
         "# Phase 3 pilot report\n\n"

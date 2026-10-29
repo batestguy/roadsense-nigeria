@@ -75,6 +75,50 @@ def test_road_mask_is_empty_for_no_paths():
     assert not mask.any()
 
 
+def test_rings_returns_a_core_and_a_disjoint_ring():
+    from roadsense import tiles
+
+    lon0, lat0 = tiles.to_wgs(681_000, 1_201_000)
+    lon1, lat1 = tiles.to_wgs(687_000, 1_207_000)
+    core, ring = sampler.rings([[[lon0, lat0], [lon1, lat1]]], 85, 150, resolution=10)
+
+    assert core.shape == ring.shape == (800, 800)
+    assert core.any() and ring.any()
+    # The ring must exclude the carriageway, or the contrast is contaminated by tarmac.
+    assert not (core & ring).any()
+
+
+def test_ring_sits_further_out_than_the_core():
+    from roadsense import tiles
+
+    lon0, lat0 = tiles.to_wgs(684_000, 1_204_000)
+    lon1, lat1 = tiles.to_wgs(684_000, 1_204_800)
+    core, ring = sampler.rings([[[lon0, lat0], [lon1, lat1]]], 85, 150, resolution=10)
+
+    # A vertical line through the tile centre: the ring must have pixels both left and right of
+    # the core, while the core itself stays narrow.
+    core_cols = np.where(core.any(axis=0))[0]
+    ring_cols = np.where(ring.any(axis=0))[0]
+    assert core_cols.max() - core_cols.min() <= 3
+    assert ring_cols.min() < core_cols.min()
+    assert ring_cols.max() > core_cols.max()
+
+
+def test_rings_are_empty_without_paths():
+    core, ring = sampler.rings([], 85, 150, resolution=40)
+    assert not core.any() and not ring.any()
+
+
+def test_contrast_is_ring_minus_core():
+    assert sampler.contrast({"ndvi_mean": 0.10}, {"ndvi_mean": 0.35}) == pytest.approx(0.25)
+
+
+def test_contrast_is_nan_when_either_side_is_missing():
+    nan = float("nan")
+    assert np.isnan(sampler.contrast({"ndvi_mean": 0.1}, {"ndvi_mean": nan}))
+    assert np.isnan(sampler.contrast({"ndvi_mean": nan}, {"ndvi_mean": 0.3}))
+
+
 def test_road_mask_marks_pixels_along_a_projected_line():
     # A short segment inside tile (85, 150); coordinates are lon/lat and must be projected.
     left, bottom = 680_000.0, 1_200_000.0
