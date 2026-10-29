@@ -25,6 +25,10 @@ on:
         description: "Number of parallel shards (48 keeps each job under ~4 h at 10 m)"
         type: number
         default: 48
+      limit_tiles:
+        description: "Tiles per shard; 0 means all. For a smoke run set shards=1 and this to 3."
+        type: number
+        default: 0
 
 concurrency:
   group: backfill-${{ inputs.resolution }}
@@ -105,12 +109,22 @@ jobs:
           path: data/interim
 
       - name: Sample shard
+        env:
+          LIMIT_TILES: ${{ inputs.limit_tiles }}
         run: |
+          # A smoke run must be cheap: the point is to prove prepare -> shard -> merge works on a
+          # runner before committing to a ~70 GB job. limit_tiles applies per shard, so a real
+          # smoke run is shards=1 with a small limit.
+          LIMIT_ARG=""
+          if [ "$LIMIT_TILES" != "0" ]; then
+            LIMIT_ARG="--limit-tiles $LIMIT_TILES"
+          fi
           python scripts/backfill.py \
             --shard ${{ matrix.shard }}/${{ inputs.shards }} \
             --resolution ${{ inputs.resolution }} \
             --start ${{ inputs.start }} \
-            --end ${{ inputs.end }}
+            --end ${{ inputs.end }} \
+            $LIMIT_ARG
 
       - name: Upload shard
         uses: actions/upload-artifact@v4
@@ -119,7 +133,10 @@ jobs:
           path: |
             data/features/imagery_r*.parquet
             data/features/backfill_state_r*.json
-          if-no-files-found: error
+          # warn, not error: a shard whose tile-months are all unavailable legitimately produces
+          # nothing, and that must not fail the whole run. The merge job fails if *no* shard
+          # produced anything, which is the signal that actually matters.
+          if-no-files-found: warn
           retention-days: 7
 
   merge:
