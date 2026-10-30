@@ -58,6 +58,51 @@ whatever shard it was in, so smaller units are cheaper to lose.
 
 ---
 
+## Backfill progress (as of 2026-10-30, 23:56 UTC)
+
+The national run is being done in 2-month windows of 96 shards, ~18 min each (F21). Windows are
+disjoint, so each produces its own `imagery-r10` artifact; they concatenate on
+`(corridor_id, tile_x, tile_y, month)` at the end. Two windows are merged and a third is in
+flight:
+
+| Window | State | Run |
+|---|---|---|
+| 2024-09 … 2024-10 | ✅ merged, 6,292 rows | 41140244419 |
+| 2024-11 … 2024-12 | ✅ merged, 6,292 rows | 41142676535 |
+| 2025-01 … 2025-02 | ✅ merged | 41144644682 |
+| 2025-03 … 2025-04 | ▶ dispatched 23:46 | 41146408420 |
+| 2025-05 … 2026-06 | ⏳ 7 windows not dispatched | — |
+
+**Check the real state first** — this table is a snapshot, not a live view:
+
+```bash
+gh run list --workflow=backfill.yml --limit 12
+```
+
+**Resume one window at a time.** The workflow keeps only one *pending* run per concurrency group, so
+dispatching a batch silently cancels all but one. Adjust the list to skip windows already merged:
+
+```bash
+for w in "2025-05 2025-06" "2025-07 2025-08" "2025-09 2025-10" "2025-11 2025-12" \
+         "2026-01 2026-02" "2026-03 2026-04" "2026-05 2026-06"; do
+  set -- $w
+  gh workflow run backfill.yml -f resolution=10 -f shards=96 -f start=$1 -f end=$2
+  sleep 1200   # the run must finish before the next dispatch, or it is cancelled
+ done
+```
+
+Notes for whoever picks this up cold:
+
+- Completed windows keep their artifacts for **90 days**. Nothing is lost if a session is cut off;
+  the loss is only of the ~18 min of the shard that was running.
+- The local driver used on 2026-10-30 is `data/run_sessions.sh` — gitignored, machine-local, and
+  without memory: restarting it replays windows from the top of its list. Use the loop above instead
+  unless you re-read that file first.
+- A per-window merge only proves the key is unique and the output is non-empty. The end-to-end
+  checks are the 22-artifact concatenation and the seasonal comparison in F22.
+
+---
+
 ## Running things
 
 ```bash
