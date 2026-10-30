@@ -612,20 +612,55 @@ failed loudly. The fix belongs in the key, not in the check.
 matches, so the per-shard state (tiles, months, seconds, rows) is silently dropped from every
 artifact. Nothing depends on it yet — it matters only once a shard is resumed across runs.
 
+### Re-run after the fix: green
+
+Workflow run 41140244419 (commit `fd82693`), same two months at 10 m, 96 shards: **96/96 shards
+succeeded, merge succeeded, 17 min 51 s end to end**.
+
+| Metric | Value |
+|---|---:|
+| Rows in `imagery_r10.parquet` | **6,292** |
+| Corridors | **850** |
+| Tiles | 2,016 |
+| Months | 2 |
+| Duplicates | **0** |
+
+The failed run produced 6,324 rows before its merge; this one produces **6,292**. The 32 missing
+rows are exactly the 32 duplicates the gate rejected — the fix removed them at the source instead
+of dropping them at the sink, which is the check that it did what it claimed.
+
+### First-look signal, two months at 10 m
+
+| Column | Mean | Non-null |
+|---|---:|---:|
+| `ndvi_core` | 0.228 | 99.9% |
+| `ndvi_ring` | 0.360 | 99.9% |
+| **`ndvi_contrast`** | **+0.1319** | 99.9% |
+| `ndbi_contrast` | −0.0550 | 99.9% |
+| `pixels_core` / `pixels_ring` (median) | 640 / 7,437 | — |
+
+The sign is right — verge greener than carriageway — and the pixel counts match the mask geometry:
+a centreline against a 100 m-wide band at 10 m comes out near 1:12 per corridor-tile-month.
+
+The **magnitude** is larger than the Lagos ablation's +0.008..+0.023 (F19). That is not yet a
+discrepancy: those were 2026-05..07 in one state, these are 2024-09..10 nationally at the end of the
+rains. Comparing like months like will be step one of the Phase 4 feature build, not an assumption
+to carry forward.
+
 ---
 
 ## F21 — The national backfill is ~1–3 hours, not 12–20
 
-Measured 2026-10-30 from the first real run (workflow run 41135798985): 2 months at 10 m, 96
-shards, 2,016 tiles.
+Measured 2026-10-30 across two runs of 2 months at 10 m, 96 shards, 2,016 tiles: 41135798985
+(sampling clean, merge failed on the duplicate key — F20) and 41140244419 (end to end, green).
 
 | Metric | Measured |
 |---|---|
-| Shards | 96, zero failures |
-| Wall clock, whole run including prepare and merge | **~20 min** |
-| Per shard, including ~2 min install/setup | median **2.8 min**, range 2.4–5.2 |
+| Shards | 96 per run, **zero failures in either** |
+| Wall clock, end to end including prepare and merge | **17 min 51 s** |
+| Per shard, including ~2 min install/setup | median **2.7 min**, range 2.4–3.4 |
 | Per tile-month at 10 m | **~1–4 s** |
-| Rows produced | 6,324 across 2,016 tiles |
+| Rows produced | **6,292** across 2,016 tiles, 2 months |
 
 The plan carried 10–30 s per tile-month, measured at 40 m from a workstation (F17), and projected
 12–20 h. Two reasons the runner is much faster:
@@ -641,7 +676,7 @@ five waves over 96 shards is **~1–3 h wall clock**, ~70 GB streamed, nothing s
 projection from two measured months, not a measurement of the whole job.
 
 **Consequences:** the 96-shard choice still holds (and is still what a cancelled job would want to
-be), but the 6 h job limit no longer binds. A 2-month session at ~20 min is now a convenience for
+be), but the 6 h job limit no longer binds. A 2-month session at ~18 min is now a convenience for
 someone with an evening, not a necessity.
 
 ---
