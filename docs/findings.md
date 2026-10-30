@@ -681,6 +681,48 @@ someone with an evening, not a necessity.
 
 ---
 
+## F22 — The contrast feature is dominated by season and land cover, not by the road
+
+Measured 2026-10-30 on the first four merged months of the national backfill (12,584 rows, 850
+corridors, 2,016 tiles, zero duplicate keys). Rows are identical every month, so nothing here is a
+coverage artefact.
+
+| Month | Rows | `ndvi_core` | `ndvi_ring` | `ndvi_contrast` | `ndbi_contrast` |
+|---|---:|---:|---:|---:|---:|
+| 2024-09 | 3,146 | 0.2454 | 0.3909 | **+0.1458** | −0.0610 |
+| 2024-10 | 3,146 | 0.2108 | 0.3287 | +0.1179 | −0.0490 |
+| 2024-11 | 3,146 | 0.1879 | 0.2844 | +0.0965 | −0.0412 |
+| 2024-12 | 3,146 | 0.1707 | 0.2544 | **+0.0838** | −0.0392 |
+
+**Every column falls monotonically from September to December**, and the contrast drops **42%** in
+four months. September is the end of the rains; November–December is the dry season, when the verge
+loses vegetation and dust settles on it. The road did not change; the calendar did.
+
+### Why this matters more than it looks
+
+A raw contrast level ranks a corridor by *when it was observed* at least as much as by its
+condition. Across corridors the same problem appears in space: the national mean is +0.13 while the
+Lagos ablation measured +0.008..+0.023 (F19). The likeliest reason is land cover rather than a
+defect — Lagos verges are urban concrete and dirt (low NDVI), national verges are grass and
+savannah (0.36 in the ring above) — but that explanation is a hypothesis and has not been measured.
+Either way the raw level is not comparable across space *or* time.
+
+### Consequence for the Phase 4 feature build
+
+1. Feed the model a **per-corridor anomaly**, not the raw level: the corridor-month contrast minus
+   that corridor's own same-calendar-month baseline, or a month-of-year normalisation fitted within
+   corridor.
+2. Measure **change against the same calendar month a year earlier**, never against the previous
+   month — a Sep→Dec difference of −0.06 is the weather, and it would otherwise look like
+   degradation on every corridor in the country at once.
+3. Keep the raw level only for within-month, within-corridor ranking, and never in a cross-sectional
+table a reader could compare across seasons.
+
+This is cheap to honour because the backfill stores one row per corridor per tile per month, so a
+seasonal baseline is a group-by, not another ingestion job.
+
+---
+
 ## F10 — Findings that are still open
 
 | # | Open question | How it gets closed |
