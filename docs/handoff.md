@@ -16,7 +16,7 @@ cloud stack. **Phases 0–2 complete; Phase 3 built and smoke-tested, national r
 | Layer | State |
 |---|---|
 | Labelling (Gate G0) | Done. Failed its threshold; the project re-scoped to corridors |
-| Corridor table | Done — 869 corridors, 18,419 km, geometry for all of them |
+| Corridor table | Done — 850 corridors, 18,419 km, geometry for all of them |
 | Dataset publishing | Code complete, **never uploaded** (needs `HF_TOKEN`) |
 | Imagery sampler | Done and measured — the cost model is measured, not estimated |
 | Backfill runner | Done, smoke-tested on a GitHub runner end to end |
@@ -40,19 +40,21 @@ The question everyone asks, answered from measured rates rather than hope:
 | Quantity | Value | Source |
 |---|---:|---|
 | Distinct 8 km tiles containing highway | 2,016 | F18 |
-| Months per tile | 24 | plan |
-| Tile-months of work | 48,384 | 2,016 × 24 |
-| Seconds per tile-month | 10–30 | F17, measured twice |
-| **Serial compute** | **134–403 h** | |
-| Bytes streamed at 10 m | **~89 GB** | F16/F17 |
-| Per shard at 96 shards | 2.1–4.2 h | |
-| **Wall clock** | **12–20 h** | ~20 concurrent jobs on the free plan, ~5 waves |
+| Months per tile | 22 (default window 2024-09 … 2026-06) | script default |
+| Tile-months of work | 44,352 | 2,016 × 22 |
+| Seconds per tile-month at 10 m | **1–4** | **F21, measured on a runner** |
+| **Serial compute** | **12–49 h** | |
+| Bytes streamed at 10 m | **~70 GB** | F16/F17 |
+| Per shard at 96 shards | 8–31 min | 462 tile-months each |
+| **Wall clock** | **~1–3 h** | ~20 concurrent jobs, ~5 waves |
 
-**12–20 hours wall clock, roughly 89 GB streamed, £0/$0.** Nothing is stored — 89 GB passes through
-and leaves behind a Parquet table of a few MB.
+**~1–3 hours wall clock, roughly 70 GB streamed, £0/$0** — measured, not projected, for two months,
+and extrapolated from there (F21). The earlier 12–20 h figure came from the 40 m workstation pilot,
+where every 8 km read cost nine overview requests instead of one base tile. Nothing is stored: the
+table that survives is a few MB.
 
-Do not use 48 shards: at the slow end that is 8.4 h per job against a 6 h limit. 96 is the default
-for that reason.
+96 shards remains the default. The 6 h job limit no longer binds, but a cancelled job still loses
+whatever shard it was in, so smaller units are cheaper to lose.
 
 ---
 
@@ -124,7 +126,7 @@ Nothing else is blocked. Everything in Phases 0–3 ran on live data.
 
 | Decision | Why | Evidence |
 |---|---|---|
-| Corridors, not segments | GRID3 names 869 corridors; 113,004 segments are unnamed | F11/F12 |
+| Corridors, not segments | GRID3 names 869 corridors, 850 once variant spellings are merged; 113,004 segments are unnamed | F11/F12/F20 |
 | 10 m imagery, not 40 m | 40 m flips the contrast sign on 20.6% of corridor-months | F19 |
 | Road-versus-verge contrast, not centreline NDVI | A centreline pixel is asphalt; NDVI ≈ 0 regardless of condition | F17/F19 |
 | Hugging Face, not Cloudflare R2 | R2 requires a payment method even on the free tier | F5 |

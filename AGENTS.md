@@ -1,7 +1,7 @@
 # Project knowledge
 
 RoadSense Nigeria — scores Nigeria's federal road **corridors** for degradation and allocates a
-fixed maintenance budget across them. The unit is the corridor (869 of them), not the segment:
+fixed maintenance budget across them. The unit is the corridor (850 of them), not the segment:
 Gate G0 showed the label join cannot support segment-level work (findings F11–F12).
 
 **Read these before doing anything:**
@@ -24,7 +24,7 @@ python -m pytest tests -q                   # 40 tests, no network
 python -m ruff check src tests scripts
 
 python scripts/run_gate0.py                 # Gate G0: ~65 MB download, then matching
-python scripts/build_corridors.py           # -> data/interim/corridors.csv (869 rows)
+python scripts/build_corridors.py           # -> data/interim/corridors.csv (850 rows)
 python scripts/build_geometry.py            # -> data/interim/corridors.geojson
 python scripts/publish_dataset.py           # -> dist/dataset/*.parquet + dataset card
 python scripts/check_warehouse.py           # DuckDB views + headline counts
@@ -36,8 +36,9 @@ python scripts/ablate_resolution.py         # 10 m vs 40 m -> docs/resolution-ab
 python scripts/backfill.py --shard 1/96 --dry-run
 ```
 
-National backfill: `gh workflow run backfill.yml -f resolution=10 -f shards=96`. Expect **12–20 h
-wall clock and ~89 GB streamed**, not stored. 48 shards risks the 6 h job limit; 96 is the default.
+National backfill: `gh workflow run backfill.yml -f resolution=10 -f shards=96`. Expect **~1–3 h
+wall clock and ~70 GB streamed**, not stored (F21, measured). 96 shards is the default; a cancelled
+job loses the shard it was in, so 2-month windows are the natural unit for a short sitting.
 
 Optional extras, by phase: `.[geo]` (rasterio, shapely, pyproj), `.[model]`
 (scikit-survival, lifelines, mlflow), `.[optimise]` (pulp), `.[platform]` (feast, dagster).
@@ -57,7 +58,7 @@ Data flow:
 ```
 OCDS bundle -> maintenance events -> road phrase + state
             -> GRID3 names        -> confidence-banded matches -> 181 high
-GRID3 segments -> corridors (869) -> geometry (GeoJSON) -> parquet -> HF Datasets -> DuckDB views
+GRID3 segments -> corridors (850) -> geometry (GeoJSON) -> parquet -> HF Datasets -> DuckDB views
 ```
 
 ## Conventions

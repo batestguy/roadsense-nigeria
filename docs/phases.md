@@ -61,17 +61,17 @@ modelling unit.
 
 - ✅ GRID3 named highway segments (53,998) with state assignment.
 - ✅ OCDS events normalised and typed (2,036 maintenance events; 1,672 with a match attempt).
-- ✅ **Corridor table: 869 corridors, 18,419 km, 66 labelled, 36 with repeat events.**
-- ✅ Corridor geometry: **869/869 corridors**, 127k vertices at 11 m tolerance, 2.74 MB raw /
+- ✅ **Corridor table: 850 corridors, 18,419 km, 66 labelled, 36 with repeat events.**
+- ✅ Corridor geometry: **850/850 corridors**, 127k vertices at 11 m tolerance, 2.73 MB raw /
   0.64 MB gzipped (findings F14).
 - ✅ Hugging Face publish path: `hf` module, `scripts/publish_dataset.py`, parquet + generated
   dataset card, `.github/workflows/pipeline.yml` rebuilding from sources and uploading.
 - ✅ Re-classification of all candidates by year × intervention type (findings F13).
 
-- ✅ DuckDB views over the parquet, verified locally: 869 corridors, 66 labelled, 18,419.1 km,
+- ✅ DuckDB views over the parquet, verified locally: 850 corridors, 66 labelled, 18,419.1 km,
   2,036 events, 181 high-confidence matches (`scripts/check_warehouse.py`).
 
-**Exit criterion:** a DuckDB query returns 869 corridors and 2,036 events; a fresh clone can fetch
+**Exit criterion:** a DuckDB query returns 850 corridors and 2,036 events; a fresh clone can fetch
 the tables over HTTPS; upload runs in CI. **Met on the build side.** The first real upload needs
 `HF_TOKEN`, the only credential this project requires, and it is a one-time manual step — the
 workflow fails loudly rather than skipping silently if it is absent.
@@ -118,9 +118,10 @@ itself.
 ablation showed 40 m preserves levels (ρ=0.937) and change (ρ=0.917) but flips the sign of the
 contrast on 20.6% of corridor-months, and sign is the feature's meaning.
 
-**National run budget:** 48,384 tile-months × 10–30 s = **134–403 h serial**, so **12–20 h wall clock
-at 96 shards** (~20 concurrent jobs, ~5 waves) and **~89 GB streamed, nothing stored**. See
-`docs/handoff.md` for the arithmetic.
+**National run budget, revised after the first real run (F21):** 44,352 tile-months at the measured
+**1–4 s** each = **12–49 h serial**, so **~1–3 h wall clock at 96 shards** (~20 concurrent jobs, ~5
+waves) and **~70 GB streamed, nothing stored**. The original 12–20 h estimate came from the 40 m
+workstation pilot, which was latency-bound on nine overview requests per 8 km read.
 
 ---
 

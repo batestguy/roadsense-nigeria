@@ -25,6 +25,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from roadsense import config, tiles  # noqa: E402
+from roadsense.corridors import alias_map  # noqa: E402
 
 CACHE = config.DATA_INTERIM / "corridor_paths.json.gz"
 CORRIDORS = config.DATA_INTERIM / "corridors.csv"
@@ -45,7 +46,9 @@ def main() -> int:
 
     with gzip.open(CACHE, "rt", encoding="utf-8") as handle:
         paths_by_name = json.load(handle)
-    corridors = pd.read_csv(CORRIDORS).set_index("name")
+    table = pd.read_csv(CORRIDORS)
+    id_by_name = alias_map(table)
+    state_by_id = dict(zip(table["corridor_id"], table["primary_state"], strict=True))
 
     per_corridor: dict[str, set[tuple[int, int]]] = {}
     for name, paths in paths_by_name.items():
@@ -75,8 +78,8 @@ def main() -> int:
 
     by_state: Counter[str] = Counter()
     for name, found in per_corridor.items():
-        state = corridors.loc[name, "primary_state"] if name in corridors.index else "?"
-        by_state[str(state)] += len(found)
+        corridor_id = id_by_name.get(name, "")
+        by_state[str(state_by_id.get(corridor_id, "?"))] += len(found)
     print("\n  tiles by primary state (top 10 — a shared tile is counted once per state):")
     for state, count in by_state.most_common(10):
         print(f"    {state:24s} {count:5,}")

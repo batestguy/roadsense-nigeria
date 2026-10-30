@@ -9,7 +9,7 @@ geo-referenced national database of failed roads — and go further by predictin
 
 **Current state (2026-10-29): Phase 2 complete, Phase 3 pilot measured; Gate G0 failed and the
 project was re-scoped to corridors.** `src/roadsense/` is a working package with 59 passing tests.
-The 869-corridor table, corridor geometry, parquet packaging, DuckDB views and the imagery sampler
+The 850-corridor table, corridor geometry, parquet packaging, DuckDB views and the imagery sampler
 all exist and have been run against live data. Modelling, optimisation and serving do **not** exist
 yet — do not assume a module or command for those.
 
@@ -39,7 +39,7 @@ python -m pytest tests -q                # 40 tests, no network needed
 python -m ruff check src tests scripts
 
 python scripts/run_gate0.py              # ~65 MB of sources -> segments, events, matches, report
-python scripts/build_corridors.py        # -> data/interim/corridors.csv (869 rows)
+python scripts/build_corridors.py        # -> data/interim/corridors.csv (850 rows)
 python scripts/build_geometry.py         # -> data/interim/corridors.geojson (caches paths)
 python scripts/publish_dataset.py        # -> dist/dataset/*.parquet + dataset card
 python scripts/publish_dataset.py --upload   # needs HF_TOKEN
@@ -52,9 +52,9 @@ python scripts/backfill.py --shard 1/96 --dry-run    # plan a shard, no download
 python scripts/backfill.py --shard 1/96 --limit-tiles 3   # smoke test, ~1 min
 ```
 
-National run: `gh workflow run backfill.yml -f resolution=10 -f shards=96` — 12–20 h wall clock,
-~89 GB streamed and discarded. 96 shards, not 48: at the slow measured rate 48 exceeds the 6 h job
-limit.
+National run: `gh workflow run backfill.yml -f resolution=10 -f shards=96` — **~1–3 h wall clock**
+for the 22-month default, ~70 GB streamed and discarded (F21, measured on a runner: 1–4 s per
+tile-month, not the 10–30 s the 40 m workstation pilot implied).
 
 The imagery scripts need `.[geo]` (rasterio, pyproj).
 
@@ -103,7 +103,7 @@ out of scope. Prefer alternatives that do not require a credit card.
   better matching cannot rescue it. The project models **corridors**, leads with an unsupervised
   satellite index, and uses the 181 interventions as external validation.
 - **The modelling unit is a corridor, not a segment.** `corridor_id` is a slug of the GRID3 name;
-  it is the join key everywhere. All 869 corridors have geometry.
+  it is the join key everywhere. All 850 corridors have geometry.
 - **Reframe the model target.** The spec's "time-to-failure" is not supportable: only ~223 project
   titles repeat, so almost no road has two dated interventions. Use a **discrete-time hazard**
   (segment-year rows, label = intervention within 12 months), train 2023–2024 and test 2025. The
@@ -137,7 +137,8 @@ out of scope. Prefer alternatives that do not require a credit card.
   negative contrast on every corridor. Dilating changes what a mask means (findings F19).
 - **The condition signal must run at 10 m, not 40 m.** 40 m preserves level (ρ=0.937) and change
   (ρ=0.917) but flips the contrast sign on 20.6% of corridor-months (findings F19). 10 m costs
-  ~70 GB / ~281 h serial; run it through `.github/workflows/backfill.yml`, never on a laptop.
+  ~70 GB but only ~12–49 h serial (F21) — and it is *faster* per tile-month than 40 m, because one
+  base tile replaces nine overview requests.
 - **GRID3 has gaps** — accept 5–10% missing segments and document them rather than fabricating coverage.
 - **Cost traps**: none currently — public repos get unlimited standard-runner Actions minutes, and
   DE Africa's S3 is anonymous with no requester-pays. Watch instead for free-tier *terms* drift, and
@@ -151,5 +152,5 @@ Architecture diagram, data dictionary, feature-engineering notebook, modelling n
 budget-optimisation notebook with sensitivity analysis, public dashboard, demo video, cost analysis.
 The README, the findings register and the dataset card exist.
 
-Already built: corridor table (869), corridor GeoJSON, parquet packaging, Hugging Face publish path,
+Already built: corridor table (850), corridor GeoJSON, parquet packaging, Hugging Face publish path,
 DuckDB views, 40 tests, CI.

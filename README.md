@@ -24,11 +24,11 @@ which corridors are deteriorating fastest, or where a fixed budget buys the most
 
 | Step | What happens | Status |
 |---|---|---|
-| 1 | Corridor network from GRID3, merged to 869 corridors | ✅ built |
+| 1 | Corridor network from GRID3, merged to 850 corridors | ✅ built |
 | 2 | Intervention records from Nigeria's open procurement data | ✅ built |
 | 3 | Cloud-free monthly Sentinel-2 composites from Digital Earth Africa | 🔄 sampler proven, sharded backfill built, national run pending |
 | 4 | Rainfall and soil moisture from Open-Meteo | ⏳ Phase 3 |
-| 5 | Degradation index across all 869 corridors (no labels needed) | ⏳ Phase 5 |
+| 5 | Degradation index across all 850 corridors (no labels needed) | ⏳ Phase 5 |
 | 6 | Budget allocation with a knapsack, and the trade-off reported honestly | ⏳ Phase 6 |
 
 ## What this repository contains today
@@ -37,7 +37,7 @@ which corridors are deteriorating fastest, or where a fixed budget buys the most
 |---|---|
 | `src/roadsense/` | Package: matching (`textmatch`, `states`, `gate0`), ingestion (`grid3`, `ocds`), modelling units (`corridors`, `geometry`), imagery (`tiles`, `sampler`, `netcount`), storage (`hf`, `warehouse`) |
 | `scripts/run_gate0.py` | Downloads sources, matches labels, writes the gate report |
-| `scripts/build_corridors.py` | Builds the 869-corridor modelling table |
+| `scripts/build_corridors.py` | Builds the 850-corridor modelling table |
 | `scripts/build_geometry.py` | Builds corridor geometry as GeoJSON (2.74 MB raw, 0.64 MB gzipped) |
 | `scripts/publish_dataset.py` | Packages parquet + dataset card, optionally uploads |
 | `scripts/check_warehouse.py` | Verifies the DuckDB views and prints headline counts |
@@ -63,7 +63,7 @@ python scripts/run_gate0.py                     # ~65 MB of sources, then matchi
 python scripts/build_corridors.py
 python scripts/build_geometry.py                # corridor GeoJSON for the map
 python scripts/publish_dataset.py               # parquet + dataset card in dist/dataset
-python scripts/check_warehouse.py               # DuckDB counts: 869 corridors, 2,036 events
+python scripts/check_warehouse.py               # DuckDB counts: 850 corridors, 2,036 events
 
 python scripts/count_tiles.py                   # 2,016 imagery tiles, no download
 python scripts/sample_pilot.py                  # measures real bytes for one state

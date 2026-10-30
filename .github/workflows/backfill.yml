@@ -82,13 +82,13 @@ jobs:
   backfill:
     needs: prepare
     runs-on: ubuntu-latest
-    # Runtime arithmetic, so the shard count is a calculation rather than a guess:
-    #   2,016 tiles x 24 months = 48,384 tile-months
-    #   measured 10-30 s each  => 134-403 h serial
-    #   96 shards            => 2.1-4.2 h per shard, comfortably under the 6 h job limit
-    #   48 shards            => 4.2-8.4 h per shard, which can exceed it
-    # GitHub also caps concurrent jobs (about 20 on the free plan), so 96 shards run in roughly
-    # five waves: expect 12-20 h wall clock for the national run, not 4.
+    # Runtime arithmetic, from the first real run rather than from the pilot's estimate (F21):
+    #   2,016 tiles x 22 months = 44,352 tile-months
+    #   measured 1-4 s each on a runner => 12-49 h serial
+    #   96 shards => 8-31 min per shard, far inside the 6 h job limit
+    # GitHub caps concurrent jobs (about 20 on the free plan), so 96 shards run in roughly five
+    # waves: a 2-month window (~462 tile-months per shard) completes in about 20 minutes.
+    # A cancelled job loses the shard it is in, so windows are the unit of resumption.
     timeout-minutes: 350
     strategy:
       fail-fast: false

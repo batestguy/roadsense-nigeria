@@ -51,7 +51,18 @@ class CorridorSummary:
 
 
 def build_corridors(segments: pd.DataFrame) -> pd.DataFrame:
-    """Aggregate named segments into one row per corridor."""
+    """Aggregate named segments into one row per corridor.
+
+    Grouped by slug rather than by raw name, because GRID3 spells one road many ways:
+    "Airport Road", "Airport road" and "AIRPORT ROAD" are three names for one corridor, as are
+    "Benin-Sagamu Expressway" and "Benin - Sagamu Expressway". Measured on the real network,
+    grouping by raw name produced 869 rows over 850 distinct slugs — 18 ids used twice, which
+    made ``corridor_id`` non-unique and broke the feature-table merge (the duplicate check saw
+    one corridor written by two names and refused to merge).
+
+    The spelling with the most segments supplies the display ``name``; the others are kept in
+    ``aliases`` so geometry and labels can still be joined through them.
+    """
     if "names" not in segments.columns:
         raise ValueError("segments table has no 'names' column")
 
@@ -59,13 +70,28 @@ def build_corridors(segments: pd.DataFrame) -> pd.DataFrame:
     working["name"] = working["names"].fillna("").astype(str).str.strip()
     working = working[working["name"] != ""]
     working["length_m"] = pd.to_numeric(working["length_m"], errors="coerce").fillna(0.0)
+    working["corridor_id"] = working["name"].map(slugify)
 
     # Normalise here as well as at ingestion: an older cached segments table may carry the
     # raw boundary name ("Abuja Federal Capital Territory") instead of the canonical "FCT".
     working["state"] = working["state"].map(normalise_state_name)
 
     rows: list[dict] = []
-    for name, group in working.groupby("name", sort=False):
+    for corridor_id, group in working.groupby("corridor_id", sort=False):
+        # Rank spellings by how much of the road uses them, so the display name is the one the
+        # data actually prefers rather than whichever sorts first.
+        stats = group.groupby("name")["length_m"].agg(segments="size", metres="sum")
+        ranked = sorted(
+            stats.index,
+            key=lambda variant: (
+                -int(stats.at[variant, "segments"]),
+                -float(stats.at[variant, "metres"]),
+                variant,
+            ),
+        )
+        name = ranked[0]
+        aliases = sorted(ranked[1:])
+
         states = [s for s in group["state"].dropna().unique()]
         primary_state = (
             group["state"].value_counts().index[0] if group["state"].notna().any() else ""
@@ -75,8 +101,9 @@ def build_corridors(segments: pd.DataFrame) -> pd.DataFrame:
         )
         rows.append(
             {
-                "corridor_id": slugify(name),
+                "corridor_id": corridor_id,
                 "name": name,
+                "aliases": "|".join(aliases),
                 "n_segments": int(len(group)),
                 "length_km": round(float(group["length_m"].sum()) / 1000.0, 3),
                 "states": "|".join(sorted(states)),
@@ -93,23 +120,74 @@ def build_corridors(segments: pd.DataFrame) -> pd.DataFrame:
     return corridors
 
 
+def _alias_column(corridors: pd.DataFrame) -> pd.Series:
+    """The ``aliases`` column, or empty strings for a table built before it existed.
+
+    ``str(float('nan'))`` is the string "nan", and NaN is truthy, so the emptiness check has to
+    be explicit rather than ``value or ""``.
+    """
+    if "aliases" not in corridors.columns:
+        return pd.Series([""] * len(corridors), index=corridors.index, dtype=object)
+    return corridors["aliases"].map(lambda value: "" if pd.isna(value) else str(value))
+
+
+def alias_map(corridors: pd.DataFrame) -> dict[str, str]:
+    """Every GRID3 spelling of a corridor name -> that corridor's ``corridor_id``.
+
+    Needed because geometry and label matches arrive keyed by the raw name, and a variant
+    spelling no longer has its own row in the corridor table.
+    """
+    mapping: dict[str, str] = {}
+    for corridor_id, name, aliases in zip(
+        corridors["corridor_id"], corridors["name"], _alias_column(corridors), strict=True
+    ):
+        mapping[str(name)] = str(corridor_id)
+        for variant in aliases.split("|"):
+            if variant:
+                mapping[variant] = str(corridor_id)
+    return mapping
+
+
+def merge_paths_by_corridor(
+    corridors: pd.DataFrame, paths_by_name: dict[str, list[list[list[float]]]]
+) -> dict[str, list[list[list[float]]]]:
+    """Re-key raw-name geometry onto corridor display names, folding in variant spellings.
+
+    Without this, merging variants would silently drop the geometry of whichever spelling lost
+    the vote for display name — e.g. 2 segments of "wudil potiskum Federal Road" next to 457 of
+    "Wudil - Potiskum Federal Road" would vanish from the map and from tile counting.
+    """
+    merged: dict[str, list[list[list[float]]]] = {}
+    for name, aliases in zip(corridors["name"], _alias_column(corridors), strict=True):
+        names = [str(name)] + [variant for variant in aliases.split("|") if variant]
+        group = [path for variant in names for path in paths_by_name.get(variant, [])]
+        if group:
+            merged[str(name)] = group
+    return merged
+
+
 def attach_labels(corridors: pd.DataFrame, matches: pd.DataFrame) -> pd.DataFrame:
-    """Count high-confidence interventions per corridor and record the years they occurred."""
+    """Count high-confidence interventions per corridor and record the years they occurred.
+
+    Joined on the slug of the matched name, not on the name itself, so an event that names a
+    variant spelling still lands on the corridor that owns it.
+    """
     high = matches[matches["confidence"] == "high"].copy()
     if high.empty:
         return corridors
 
-    grouped = high.groupby("matched_name")
+    high["corridor_id"] = high["matched_name"].astype(str).map(slugify)
+    grouped = high.groupby("corridor_id")
     events: dict[str, int] = grouped.size().to_dict()
     years: dict[str, list[int]] = {
-        name: sorted({int(y) for y in frame["year"].dropna()})
-        for name, frame in grouped
+        corridor_id: sorted({int(y) for y in frame["year"].dropna()})
+        for corridor_id, frame in grouped
     }
 
     corridors = corridors.copy()
-    corridors["label_events"] = corridors["name"].map(events).fillna(0).astype(int)
-    corridors["label_years"] = corridors["name"].map(
-        lambda name: "|".join(str(y) for y in years.get(name, []))
+    corridors["label_events"] = corridors["corridor_id"].map(events).fillna(0).astype(int)
+    corridors["label_years"] = corridors["corridor_id"].map(
+        lambda corridor_id: "|".join(str(y) for y in years.get(corridor_id, []))
     )
     return corridors
 

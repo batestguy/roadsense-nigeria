@@ -23,6 +23,7 @@ assumptions that have already been shown to be false.
 | F16 | The "20 m is 10× cheaper" plan was wrong by ~9×; 20 m costs 857 KB per 8 km tile vs 934 KB at 10 m | Sampler defaults to 40 m; national backfill is ~31 GB, not 13 |
 | F17 | Centreline NDVI on a road is ≈ 0 — it measures asphalt | Phase 4 needs a road-versus-verge contrast, not a centreline band |
 | F19 | The contrast feature is trustworthy at 10 m but flips sign on 1 in 5 corridor-months at 40 m | The condition signal must run at 10 m (~70 GB), while a landscape index can run at 40 m (31 GB) |
+| F20 | 869 GRID3 names are **850 corridors**: 18 slugs were shared by case/punctuation variants, so `corridor_id` was not unique and the first real backfill merge refused to run | Corridors are grouped by slug with the other spellings kept as aliases; the merge gate stays strict |
 
 ---
 
@@ -322,7 +323,11 @@ Built by `scripts/build_corridors.py` from the 53,998 named segments.
 | Corridors with ≥2 interventions (repeat events) | **36** |
 | Labelled events | 181 |
 
-**Why corridors are the right unit now:** the 181 signatures spread across 869 corridors × 3 usable
+> **Superseded on the count by F20 (2026-10-30):** 869 distinct *names* collapse to **850 corridors**
+> once case/punctuation variants are merged, which is what the table holds. Length (18,419.1 km),
+> labels (66 corridors / 181 events) and coverage are unchanged by the merge.
+
+**Why corridors are the right unit now:** the 181 signatures spread across 850 corridors × 3 usable
 years gives roughly a 7% per-corridor-year event rate — far more workable than 181 against 167,002
 segments. The 36 repeat-event corridors are the only subset that can support a genuine survival
 analysis, and they should be reported as such.
@@ -364,9 +369,11 @@ anomaly in the *raw candidate* set is a capital-works bulge, not a burst of road
 
 ---
 
-## F14 — Corridor geometry: all 869 corridors, 2.74 MB
+## F14 — Corridor geometry: all corridors, 2.74 MB
 
-Measured 2026-10-29 via `scripts/build_geometry.py`. The Gate G0 segment table kept only centroids,
+Measured 2026-10-29 via `scripts/build_geometry.py`. Rebuilt after the F20 merge: **850/850
+corridors**, same 127,091 vertices, 2.73 MB.
+ The Gate G0 segment table kept only centroids,
 which is enough to match but not to draw, so geometry was refetched and merged by corridor name.
 
 | Metric | Value |
@@ -503,7 +510,7 @@ fetched. This closes O2.
 
 | Metric | Value |
 |---|---:|
-| Corridors with geometry | 869 |
+| Corridors with geometry | 869 (850 after F20) |
 | **Distinct 8 km tiles containing highway** | **2,016** |
 | Distinct 96 km items | 97 |
 | Median tiles per corridor | 2 |
@@ -551,6 +558,91 @@ corridors (+0.008 to +0.023 at 10 m), with carriageway NDVI of 0.03–0.12 — a
 
 The lesson generalises: at a 40 m pixel, **any** band narrower than ~80 m cannot be separated from
 its surroundings. Dilating a mask is not free geometry; it changes what the mask means.
+
+---
+
+## F20 — 869 names are 850 corridors, and the duplicate key broke the first real merge
+
+Measured 2026-10-30 on the first real backfill run (workflow run 41135798985: 2 months at 10 m,
+96 shards). All 96 shards sampled cleanly — 6,324 rows across 2,016 tiles, zero failures — and
+then the merge job **failed** with `shards overlap; check the strided split` over **32 duplicate
+`(corridor_id, tile_x, tile_y, month)` rows**.
+
+The shards were not overlapping. `corridors.csv` held **869 rows over 850 distinct
+`corridor_id`s**: 18 slugs were used more than once, every one of them a case/punctuation variant
+of a single road.
+
+| slug | spellings (segments) |
+|---|---|
+| `airport-road` | Airport Road (321) · Airport road (6) · AIRPORT ROAD (6) |
+| `benin-sagamu-expressway` | Benin-Sagamu Expressway (336) · Benin - Sagamu Expressway (53) |
+| `wudil-potiskum-federal-road` | Wudil - Potiskum Federal Road (457) · wudil potiskum Federal Road (2) |
+| 15 others | `ahmadu-bello-way`, `east-west-road`, `lagos-badagry-expressway`, … |
+
+**Why this is worse than one failed job:** `corridor_id` is the join key for every table
+upstream and downstream, and it was not unique. A road spelled two ways became two ids, so its
+imagery rows, its labels and its risk score would have been split between them. The merge gate
+was the only thing that noticed.
+
+**Fix:** group by slug, not by raw name. The spelling with the most segments (then the most
+metres) supplies the display name; the others are kept in an `aliases` column so geometry and
+label matches still join through them. `attach_labels` joins on the slug of `matched_name`, and
+`geometry`/`backfill`/`count_tiles` resolve raw names through `corridors.alias_map`.
+
+| Metric | Before | After |
+|---|---:|---:|
+| Corridor rows | 869 | **850** |
+| Distinct `corridor_id` | 850 | **850** |
+| Duplicate ids | 18 (37 rows) | **0** |
+| Named length | 18,419.1 km | **18,419.1 km** |
+| Median corridor length | 4.57 km | **4.65 km** |
+| Corridors with a high-confidence label | 66 | **66** |
+| Label events | 181 | **181** |
+| Corridors with geometry | 869/869 | **850/850** |
+| GeoJSON | 2.74 MB | **2.73 MB** |
+
+Length, labels and coverage are unchanged, which is the check that this merged spellings of one
+road rather than absorbing different roads into each other.
+
+**The gate behaved correctly.** It refused to publish a table whose key was not unique, and it
+failed loudly. The fix belongs in the key, not in the check.
+
+**Also found, unfixed:** the workflow uploads `data/features/backfill_state_r*.json`, but
+`scripts/backfill.py` writes its state file as `imagery_r{res}_shardNNofMM.json`. The glob never
+matches, so the per-shard state (tiles, months, seconds, rows) is silently dropped from every
+artifact. Nothing depends on it yet — it matters only once a shard is resumed across runs.
+
+---
+
+## F21 — The national backfill is ~1–3 hours, not 12–20
+
+Measured 2026-10-30 from the first real run (workflow run 41135798985): 2 months at 10 m, 96
+shards, 2,016 tiles.
+
+| Metric | Measured |
+|---|---|
+| Shards | 96, zero failures |
+| Wall clock, whole run including prepare and merge | **~20 min** |
+| Per shard, including ~2 min install/setup | median **2.8 min**, range 2.4–5.2 |
+| Per tile-month at 10 m | **~1–4 s** |
+| Rows produced | 6,324 across 2,016 tiles |
+
+The plan carried 10–30 s per tile-month, measured at 40 m from a workstation (F17), and projected
+12–20 h. Two reasons the runner is much faster:
+
+1. **The 40 m pilot was latency-bound, not bandwidth-bound.** An 8 km footprint at 40 m needs nine
+   256 px overview tiles per band — 27 requests for three bands. At 10 m it needs one 800 px base
+   tile per band — three requests (F16). Fewer round trips beat more pixels, which is why 10 m is
+   *cheaper in wall clock* than 40 m even though it moves more bytes.
+2. Shards run concurrently on a runner with a better path to `af-south-1` than a home connection.
+
+Extrapolated to the full 22-month default: 462 tile-months per shard at 1–4 s is 8–31 min, and
+five waves over 96 shards is **~1–3 h wall clock**, ~70 GB streamed, nothing stored. That is a
+projection from two measured months, not a measurement of the whole job.
+
+**Consequences:** the 96-shard choice still holds (and is still what a cancelled job would want to
+be), but the 6 h job limit no longer binds. A 2-month session at ~20 min is now a convenience for
+someone with an evening, not a necessity.
 
 ---
 

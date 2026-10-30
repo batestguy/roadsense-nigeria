@@ -18,6 +18,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from roadsense import warehouse  # noqa: E402
 
+#: Corridors the build should produce. This changes when the name grouping changes, not when the
+#: data drifts: 850 since case/punctuation variants were merged (findings F20), down from 869 rows.
+EXPECTED_CORRIDORS = 850
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -49,8 +53,12 @@ def main() -> int:
     for name, state, km, events, years in stale:
         print(f"    {name[:44]:44s} {state:12s} {km:7.1f} km  {events} events  {years}")
 
-    if summary["corridors"] != 869:
-        print(f"\n[warehouse] unexpected corridor count: {summary['corridors']}", file=sys.stderr)
+    if summary["corridors"] != EXPECTED_CORRIDORS:
+        print(
+            f"\n[warehouse] unexpected corridor count: {summary['corridors']} "
+            f"(expected {EXPECTED_CORRIDORS})",
+            file=sys.stderr,
+        )
         return 1
 
     print("\n[warehouse] ok")

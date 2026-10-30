@@ -38,6 +38,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from roadsense import config, sampler, tiles  # noqa: E402
+from roadsense.corridors import alias_map  # noqa: E402
 
 CORRIDORS = config.DATA_INTERIM / "corridors.csv"
 PATHS = config.DATA_INTERIM / "corridor_paths.json.gz"
@@ -73,22 +74,30 @@ def parse_shard(value: str) -> tuple[int, int]:
     return index_i, total_i
 
 
-def load_index() -> tuple[dict, dict[str, list[tuple[str, list[list[float]]]]]]:
-    """Tile -> the corridors crossing it, plus corridor ids and names."""
+def load_index() -> tuple[dict[str, str], dict[tuple[int, int], list[tuple[str, str, list]]]]:
+    """Tile -> the corridors crossing it, plus ``corridor_id -> canonical name``.
+
+    Names resolve through the alias map: a variant spelling still has geometry in the cache but
+    no row of its own in the corridor table (findings F20). Resolving through the alias keeps
+    its paths, and grouping on the canonical name means one corridor crossing a tile under two
+    spellings yields one row rather than two — the duplicate that failed the merge gate.
+    """
     with gzip.open(PATHS, "rt", encoding="utf-8") as handle:
         paths_by_name = json.load(handle)
-    corridors = pd.read_csv(CORRIDORS)
-    by_name = corridors.set_index("name")
+    table = pd.read_csv(CORRIDORS)
+    id_by_name = alias_map(table)
+    name_by_id = dict(zip(table["corridor_id"], table["name"], strict=True))
 
     index: dict[tuple[int, int], list[tuple[str, str, list[list[float]]]]] = defaultdict(list)
     for name, paths in paths_by_name.items():
-        if name not in by_name.index:
+        corridor_id = id_by_name.get(name)
+        if corridor_id is None:
             continue
-        corridor_id = str(by_name.loc[name, "corridor_id"])
+        canonical = name_by_id[corridor_id]
         for path in paths:
             for tile in tiles.corridor_tiles([path]):
-                index[tile].append((corridor_id, name, path))
-    return by_name.to_dict("index"), dict(index)
+                index[tile].append((corridor_id, canonical, path))
+    return name_by_id, dict(index)
 
 
 def months_in(start: str, end: str) -> list[str]:

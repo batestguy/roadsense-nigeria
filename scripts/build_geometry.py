@@ -24,6 +24,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from roadsense import config, geometry  # noqa: E402
+from roadsense.corridors import merge_paths_by_corridor  # noqa: E402
 
 CORRIDORS = config.DATA_INTERIM / "corridors.csv"
 CACHE = config.DATA_INTERIM / "corridor_paths.json.gz"
@@ -58,22 +59,31 @@ def main() -> int:
         print(f"missing {CORRIDORS}; run scripts/build_corridors.py first", file=sys.stderr)
         return 1
 
-    corridors = pd.read_csv(CORRIDORS)
-    paths = load_paths(args.force)
+    table = pd.read_csv(CORRIDORS)
+    paths_by_name = load_paths(args.force)
 
-    raw_vertices = sum(len(path) for group in paths.values() for path in group)
+    raw_vertices = sum(len(path) for group in paths_by_name.values() for path in group)
     print(
-        f"[geometry] cache holds {len(paths):,} names, "
-        f"{sum(len(g) for g in paths.values()):,} paths, {raw_vertices:,} vertices"
+        f"[geometry] cache holds {len(paths_by_name):,} names, "
+        f"{sum(len(g) for g in paths_by_name.values()):,} paths, {raw_vertices:,} vertices"
     )
 
-    fc = geometry.build_feature_collection(corridors, paths, tolerance=args.tolerance)
+    # Variant spellings of one corridor are separate names in the cache but one row in the
+    # table, so fold them together before the join (findings F20).
+    paths = merge_paths_by_corridor(table, paths_by_name)
+    matched_vertices = sum(len(path) for group in paths.values() for path in group)
+    print(
+        f"[geometry] {len(paths):,} corridors matched, {matched_vertices:,} vertices "
+        f"({'complete' if matched_vertices == raw_vertices else 'partial'})"
+    )
+
+    fc = geometry.build_feature_collection(table, paths, tolerance=args.tolerance)
     geometry.write_feature_collection(fc, OUT)
 
     size_mb = OUT.stat().st_size / 1e6
     covered = len(fc["features"])
     print("\n[geometry] built")
-    print(f"  {'corridors in table':28s} {len(corridors):,}")
+    print(f"  {'corridors in table':28s} {len(table):,}")
     print(f"  {'corridors with geometry':28s} {covered:,}")
     print(f"  {'corridors missing geometry':28s} {len(fc['missing']):,}")
     print(f"  {'vertices after simplify':28s} {fc['total_vertices']:,}")
