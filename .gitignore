@@ -19,8 +19,9 @@ mlruns/
 mlflow.db
 .feast/
 
-# Agent tooling — not part of the product
+# Agent tooling - not part of the product
 .agents/
+.agent/
 
 # Editor / OS
 .vscode/

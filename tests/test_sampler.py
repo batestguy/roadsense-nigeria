@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import email.message
+import json
+import urllib.error
+import urllib.request
+
 import pytest
 
 # Import guard first: roadsense.sampler imports rasterio at module level, and rasterio is an
@@ -132,3 +137,149 @@ def test_road_mask_marks_pixels_along_a_projected_line():
     assert mask.any()
     # The line runs corner to corner, so it must not flag the whole tile.
     assert mask.mean() < 0.3
+
+
+# --- STAC search retry ---------------------------------------------------------------------------
+#
+# Run 41149975095 lost 12 of 96 shards to a 503 storm on `stac/search`. These tests script
+# urllib.request.urlopen and record the sleeps, so the schedule is proved without waiting for it.
+
+SEARCH_URL = "https://explorer.digitalearth.africa/stac/search"
+
+
+class _JsonResponse:
+    """The subset of an ``http.client.HTTPResponse`` that ``_post_json`` touches."""
+
+    def __init__(self, payload: dict):
+        self._body = json.dumps(payload).encode("utf-8")
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+
+class _HtmlResponse(_JsonResponse):
+    """A 200 carrying an error page — what an overloaded proxy actually returns."""
+
+    def __init__(self):
+        self._body = b"<html><body>503 Service Temporarily Unavailable</body></html>"
+
+
+def _http_error(code: int, *, retry_after: str | None = None) -> urllib.error.HTTPError:
+    headers = email.message.Message()
+    if retry_after is not None:
+        headers["Retry-After"] = retry_after
+    return urllib.error.HTTPError(SEARCH_URL, code, "Service Temporarily Unavailable", headers, None)
+
+
+def _script_urlopen(monkeypatch, script: list) -> list:
+    """Replace ``urlopen``; each entry is a response or an exception. Returns the requests made."""
+    calls: list = []
+
+    def fake_urlopen(req, timeout=None):
+        calls.append(req)
+        outcome = script[len(calls) - 1]
+        if isinstance(outcome, BaseException):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    return calls
+
+
+def test_search_post_retries_six_503s_and_then_succeeds(monkeypatch):
+    calls = _script_urlopen(monkeypatch, [_http_error(503)] * 6 + [_JsonResponse({"features": []})])
+    sleeps: list[float] = []
+
+    payload = sampler._post_json(SEARCH_URL, {"collections": ["x"]}, sleep=sleeps.append)
+
+    assert payload == {"features": []}
+    # Six failures then the answer: seven attempts, six waits between them.
+    assert len(calls) == 7
+    assert len(sleeps) == 6
+    assert all(delay >= 1.0 for delay in sleeps)
+
+
+def test_search_post_gives_up_loudly_after_a_bounded_number_of_attempts(monkeypatch):
+    calls = _script_urlopen(monkeypatch, [_http_error(503)] * 12)
+    sleeps: list[float] = []
+
+    with pytest.raises(RuntimeError) as excinfo:
+        sampler._post_json(SEARCH_URL, {}, sleep=sleeps.append)
+
+    message = str(excinfo.value)
+    assert "STAC search failed at" in message and SEARCH_URL in message
+    assert "503" in message
+    # Bounded, and bounded generously enough to ride out the storm that killed the run.
+    assert sampler.SEARCH_ATTEMPTS == 10
+    assert len(calls) == sampler.SEARCH_ATTEMPTS
+    assert len(sleeps) == sampler.SEARCH_ATTEMPTS - 1
+    assert sum(sleeps) >= 180.0, "must tolerate at least ~3 minutes of continuous 503"
+    for attempt, delay in enumerate(sleeps):
+        base = min(2.0**attempt, sampler.SEARCH_BACKOFF_CAP_S)
+        assert base <= delay <= base * (1.0 + sampler.SEARCH_JITTER)
+
+
+def test_search_post_makes_one_attempt_when_the_first_call_succeeds(monkeypatch):
+    calls = _script_urlopen(monkeypatch, [_JsonResponse({"features": [{"id": "a"}]})])
+    sleeps: list[float] = []
+
+    payload = sampler._post_json(SEARCH_URL, {}, sleep=sleeps.append)
+
+    assert payload == {"features": [{"id": "a"}]}
+    assert len(calls) == 1
+    assert sleeps == []
+
+
+def test_search_post_does_not_retry_a_bad_request(monkeypatch):
+    # A 400 is a broken request body; the tenth attempt sends the same body. Fail at once.
+    calls = _script_urlopen(monkeypatch, [_http_error(400), _JsonResponse({})])
+    sleeps: list[float] = []
+
+    with pytest.raises(RuntimeError, match="STAC search failed at"):
+        sampler._post_json(SEARCH_URL, {}, sleep=sleeps.append)
+
+    assert len(calls) == 1
+    assert sleeps == []
+
+
+def test_search_post_honours_retry_after_and_caps_it(monkeypatch):
+    calls = _script_urlopen(
+        monkeypatch,
+        [_http_error(503, retry_after="7"), _http_error(503, retry_after="99999"), _JsonResponse({})],
+    )
+    sleeps: list[float] = []
+
+    sampler._post_json(SEARCH_URL, {}, sleep=sleeps.append)
+
+    assert len(calls) == 3
+    assert sleeps[0] == 7.0
+    # A misconfigured header must not hold a shard open for hours.
+    assert sleeps[1] == sampler.RETRY_AFTER_CAP_S
+
+
+def test_search_post_retries_a_dropped_connection(monkeypatch):
+    calls = _script_urlopen(
+        monkeypatch, [urllib.error.URLError("connection reset"), _JsonResponse({"features": []})]
+    )
+
+    payload = sampler._post_json(SEARCH_URL, {}, sleep=lambda _delay: None)
+
+    assert payload == {"features": []}
+    assert len(calls) == 2
+
+
+def test_search_post_retries_a_non_json_body(monkeypatch):
+    # An overloaded proxy answers 200 with an HTML error page; that is a transport failure.
+    calls = _script_urlopen(monkeypatch, [_HtmlResponse(), _JsonResponse({"features": []})])
+
+    payload = sampler._post_json(SEARCH_URL, {}, sleep=lambda _delay: None)
+
+    assert payload == {"features": []}
+    assert len(calls) == 2
+

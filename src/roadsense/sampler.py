@@ -21,7 +21,11 @@ say so.
 from __future__ import annotations
 
 import json
+import random
 import time
+import urllib.error
+import urllib.request
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -143,9 +147,58 @@ def _next_body(payload: dict) -> dict | None:
     return None
 
 
-def _post_json(url: str, body: dict, *, attempts: int = 3) -> dict[str, Any]:
-    """POST JSON and return the parsed response, retrying transient failures."""
-    import urllib.request
+#: Statuses from the STAC search worth retrying: 429 is rate limiting, 5xx is the endpoint being
+#: overloaded. 501 is excluded on purpose — "not implemented" does not become implemented on retry.
+RETRY_STATUS: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+
+#: Ceiling on one backoff sleep, seconds.
+SEARCH_BACKOFF_CAP_S = 60.0
+
+#: Fraction of each backoff added as random jitter, so 96 concurrent workers do not retry in phase.
+SEARCH_JITTER = 0.5
+
+#: Hard ceiling on a single ``Retry-After`` sleep, seconds.
+RETRY_AFTER_CAP_S = 180.0
+
+#: Attempts for a search POST. The sleeps alone sum to 243 s (1+2+4+8+16+32+60+60+60), which
+#: outlasts the ~2.5 min of continuous 503 that killed 12 of 96 shards in run 41149975095.
+SEARCH_ATTEMPTS = 10
+
+
+def _post_json(
+    url: str,
+    body: dict,
+    *,
+    attempts: int = SEARCH_ATTEMPTS,
+    sleep: Callable[[float], None] | None = None,
+    jitter: float = SEARCH_JITTER,
+) -> dict[str, Any]:
+    """POST JSON and return the parsed response, retrying transient failures.
+
+    The budget is sized for the failure this endpoint actually produces. When 96 shard workers hit
+    ``explorer.digitalearth.africa/stac/search`` at once it answers 503 for minutes at a stretch:
+    run 41149975095 lost 12 of 96 shards after ~2.5 min of continuous 503, and the whole 2-month
+    window with them. Three attempts and 3.5 s of patience was not a retry, it was a formality.
+
+    What is retried: 429 and 500/502/503/504, connection-level errors, and a body that is not JSON
+    (an overloaded proxy serves an HTML error page under a 200). What is not: any other 4xx — a 400
+    means the request body is wrong and will still be wrong on the tenth attempt, so retrying it for
+    four minutes only delays the loud failure. The full schedule is 1+2+4+8+16+32+60+60+60 = 243 s
+    across 10 attempts, more than the ~2.5 min outage that killed the run; each delay is jittered by
+    up to +50% so the workers do not return in lockstep, and a ``Retry-After`` header overrides the
+    schedule (capped at 180 s) when the server states one.
+
+    This budget is deliberately different from :func:`read_tile`'s. There the failure mode is a
+    stalled socket on an S3 range read, where a short backoff is correct; here it is a rate-limited
+    shared endpoint, where giving up early discards a 20-minute shard. Both stay loud: a search that
+    never succeeds raises rather than skipping the shard, because a silently missing shard would
+    contaminate the merged feature table.
+
+    ``sleep`` and ``jitter`` are injectable so the schedule can be tested without waiting for it.
+    """
+    if attempts < 1:
+        raise ValueError("attempts must be at least 1")
+    do_sleep = time.sleep if sleep is None else sleep
 
     data = json.dumps(body).encode("utf-8")
     last_error: Exception | None = None
@@ -164,11 +217,63 @@ def _post_json(url: str, body: dict, *, attempts: int = 3) -> dict[str, Any]:
         try:
             with urllib.request.urlopen(req, timeout=90) as resp:
                 return json.loads(resp.read().decode("utf-8"))
-        except Exception as exc:  # noqa: BLE001 - retried below, re-raised after
+        except Exception as exc:  # noqa: BLE001 - classified below, re-raised after
+            if not _is_retryable(exc):
+                raise RuntimeError(f"STAC search failed at {url}: {exc}") from exc
             last_error = exc
-            time.sleep(min(2**attempt, 8))
+            if attempt + 1 >= attempts:
+                break
+            delay = _backoff_seconds(attempt, jitter=jitter)
+            retry_after = _retry_after_seconds(exc)
+            if retry_after is not None:
+                delay = max(delay, retry_after)
+            do_sleep(delay)
 
     raise RuntimeError(f"STAC search failed at {url}: {last_error}") from last_error
+
+
+def _is_retryable(exc: Exception) -> bool:
+    """Whether a failed search POST is worth another attempt.
+
+    ``HTTPError`` is a subclass of ``URLError``, so the status check has to come first.
+    """
+    if isinstance(exc, urllib.error.HTTPError):
+        return exc.code in RETRY_STATUS
+    if isinstance(exc, (urllib.error.URLError, OSError)):
+        return True
+    # json.JSONDecodeError is a ValueError: a truncated or non-JSON body.
+    return isinstance(exc, (ValueError, UnicodeDecodeError))
+
+
+def _backoff_seconds(attempt: int, *, jitter: float = SEARCH_JITTER) -> float:
+    """Exponential backoff for a zero-based ``attempt``, capped and jittered upwards."""
+    base = min(float(2**attempt), SEARCH_BACKOFF_CAP_S)
+    return base * (1.0 + random.random() * jitter)
+
+
+def _retry_after_seconds(exc: Exception) -> float | None:
+    """The server's ``Retry-After`` in seconds, if it stated one as a delay.
+
+    HTTP-date values are ignored rather than parsed: no DE Africa response has used one, and a
+    wrong parse would silently shorten the wait. An absurd value is capped, so a misconfigured
+    header cannot hold a shard open for hours.
+    """
+    headers = getattr(exc, "headers", None)
+    if headers is None:
+        return None
+    try:
+        raw = headers.get("Retry-After")
+    except Exception:  # noqa: BLE001 - a header object that cannot be read states nothing
+        return None
+    if raw is None:
+        return None
+    try:
+        seconds = float(str(raw).strip())
+    except ValueError:
+        return None
+    if seconds < 0:
+        return None
+    return min(seconds, RETRY_AFTER_CAP_S)
 
 
 def _to_item(feature: dict) -> Item | None:
