@@ -19,7 +19,10 @@ Checks, in order of severity:
    run still exits zero: the page is generated from data, the prose is not, and the prose is
    what must be brought into line.
 
-Four charts, hand-emitted SVG, no plotting library, no network, no JavaScript.
+Five figures, hand-emitted SVG, no plotting library, no network, no JavaScript — including a
+map of the corridor network coloured by year-over-year movement, drawn with its caveat inside
+the figure because a change map read as a condition map is the failure mode this page exists
+to prevent.
 """
 
 from __future__ import annotations
@@ -39,6 +42,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 CONDITION = ROOT / "data" / "interim" / "condition.parquet"
+CORRIDORS = ROOT / "data" / "interim" / "corridors.geojson"
 VALIDATION = ROOT / "data" / "interim" / "validation_v2.json"
 MATCHED = ROOT / "data" / "interim" / "validation_v2_matched.csv"
 IMAGERY_MANIFEST = ROOT / "data" / "features" / "imagery_r10.manifest.json"
@@ -319,6 +323,11 @@ def build_facts() -> tuple[dict[str, Any], list[str], list[str]]:
     # Chart 4 — the variance split.
     split = variance_split(condition)
 
+    # Figure 5 — the map. Geometry is projected and simplified once, here, so ``facts`` carries
+    # the small numbers and ``svg_map`` reuses the same cached layer rather than re-reading the
+    # GeoJSON. Nothing about a corridor's colour is decided in the renderer.
+    layer = map_layer()
+
     # Provenance and the "what was checked" list.
     imagery_rows = int(imagery["rows"])
     weather_rows = int(weather["coverage"]["rows_present"])
@@ -411,6 +420,7 @@ def build_facts() -> tuple[dict[str, Any], list[str], list[str]]:
             "n_obs": fint(split["n_obs"]),
             "missing_cells": fint(corridor_months - int(len(usable))),
         },
+        "map": layer["facts"],
         "checks": {
             "imagery_rows": fint(imagery_rows),
             "imagery_months": len(imagery["months_covered"]),
@@ -647,8 +657,7 @@ def svg_forest(f: dict[str, Any]) -> str:
         )
     parts.append(
         f'<text x="{plot_l}" y="{h - 10}" font-size="11" fill="{MUTED}">'
-        "Area under the curve: no ranking at the chance line, "
-        'clears the bar only to the right of the red line</text>'
+        "AUC, higher is better; the red line is the bar</text>"
     )
     return (
         f'<svg viewBox="0 0 {w} {h}" role="img" aria-labelledby="c3t c3d" class="chart">'
@@ -728,6 +737,327 @@ def svg_variance(f: dict[str, Any]) -> str:
     )
 
 
+# --- the map (figure 5) -----------------------------------------------------------------
+# The map answers one question: where did the contrast move. It is drawn from the corridor
+# geometry and the per-corridor mean year-over-year change, in a single self-contained SVG.
+#
+# Three decisions are made here rather than in the renderer, and all three are computed:
+#
+# 1. **The colour bands.** Two thresholds either side of zero, both derived from the spread of
+#    the data: the outer one is the 90th percentile of absolute movement rounded to a readable
+#    step, the inner one is half of it. Nothing about "how much is a lot" is typed.
+# 2. **The neutral treatment.** A corridor with no usable change value is drawn in a separate
+#    neutral dash, never given an interpolated colour. On this vintage every corridor has at
+#    least five monthly values, so that class is empty — and the page says so with the count
+#    rather than quietly omitting the class.
+# 3. **Partial coverage.** A corridor whose mean rests on fewer than the full comparison window
+#    is marked with a dotted casing, so a value built from five months does not look like one
+#    built from ten. 183 corridor-months of the panel carry no contrast at all; the ones that
+#    fall inside the change window are simply absent, and are counted in the caption.
+
+MAP_W, MAP_H, MAP_PAD = 640, 540, 8
+
+# Douglas-Peucker would be better and is 30 lines; this is the 6-line version. A vertex is kept
+# only when it is at least MAP_TOL viewBox units from the last kept vertex. At 640 units across
+# a 375 px viewport one unit is about half a display pixel, so this removes near-duplicate
+# vertices rather than shape: the network is not visibly distorted at any width.
+MAP_TOL = 1.0
+
+# Diverging ramp, warm for falling and cool for rising, with lightness rising away from zero so
+# the scale survives greyscale printing as well as the legend labels that carry the meaning.
+BAND_COLOURS: dict[str, str] = {
+    "fall_hard": "#7d1d10",
+    "fall_mild": "#bf6f57",
+    "steady": "#a7b1b7",
+    "rise_mild": "#4f8f83",
+    "rise_hard": "#0b4f45",
+}
+NO_VALUE_COLOUR = "#cfd6da"
+BAND_ORDER = ["fall_hard", "fall_mild", "steady", "rise_mild", "rise_hard", "no_value"]
+
+_MAP_LAYER: dict[str, Any] | None = None
+
+
+def _nice_step(x: float) -> float:
+    """Round a positive magnitude to one of 1, 2, 5 times a power of ten."""
+    if not math.isfinite(x) or x <= 0:
+        return 1.0
+    exp = math.floor(math.log10(x))
+    f = x / (10.0**exp)
+    n = 1.0 if f <= 1.5 else 2.0 if f <= 3.5 else 5.0 if f <= 7.5 else 10.0
+    return n * (10.0**exp)
+
+
+def map_layer() -> dict[str, Any]:
+    """Project, simplify, band and colour the corridor geometry. Deterministic, reads twice."""
+    global _MAP_LAYER
+    if _MAP_LAYER is not None:
+        return _MAP_LAYER
+
+    geo = json.loads(CORRIDORS.read_text(encoding="utf-8"))
+    condition = pd.read_parquet(CONDITION)
+
+    grouped = condition.groupby("corridor_id")["ndvi_yoy"]
+    mean_change = grouped.mean()
+    usable_months = grouped.count()
+    window = sorted(str(m) for m in condition.loc[condition["ndvi_yoy"].notna(), "month"].unique())
+    window_rows = condition[condition["month"].isin(window)]
+    cells_in_window = int(len(window_rows))
+    cells_with_value = int(window_rows["ndvi_yoy"].notna().sum())
+    cells_missing_window = cells_in_window - cells_with_value
+    months_in_window = len(window)
+
+    # --- bands, from the data -----------------------------------------------------------
+    values = mean_change.dropna()
+    if values.empty:
+        raise SystemExit("map: no corridor has a change value")
+    p90 = float(np.percentile(np.abs(values.to_numpy()), 90))
+    outer = _nice_step(p90)
+    inner = outer / 2.0
+    if inner <= 0 or outer <= inner:
+        raise SystemExit(f"map: band thresholds degenerate ({inner}, {outer})")
+
+    def band_of(change: float | None) -> str:
+        if change is None or not math.isfinite(change):
+            return "no_value"
+        movement = -float(change)  # sign flipped: a falling contrast reads as falling
+        if movement >= outer:
+            return "fall_hard"
+        if movement >= inner:
+            return "fall_mild"
+        if movement <= -outer:
+            return "rise_hard"
+        if movement <= -inner:
+            return "rise_mild"
+        return "steady"
+
+    # --- geometry -----------------------------------------------------------------------
+    features = geo["features"]
+    parts: dict[str, list[list[tuple[float, float]]]] = {}
+    lons: list[float] = []
+    lats: list[float] = []
+    source_vertices = 0
+    for feature in features:
+        props = feature["properties"]
+        cid = str(props["corridor_id"])
+        geometry = feature["geometry"]
+        gtype = str(geometry["type"])
+        raw = geometry["coordinates"]
+        rings = raw if gtype == "MultiLineString" else [raw]
+        parts[cid] = []
+        for ring in rings:
+            pts = [(float(p[0]), float(p[1])) for p in ring if len(p) >= 2]
+            if not pts:
+                continue
+            source_vertices += len(pts)
+            for lon, lat in pts:
+                lons.append(lon)
+                lats.append(lat)
+            parts[cid].append(pts)
+
+    if not lons:
+        raise SystemExit("map: the GeoJSON has no coordinates")
+
+    missing_geom = sorted(set(mean_change.index.astype(str)) - set(parts))
+    missing_value = sorted(set(parts) - set(mean_change.index.astype(str)))
+    if missing_geom or missing_value:
+        raise SystemExit(
+            "map: geometry and condition disagree — "
+            f"{len(missing_geom)} corridors without geometry, "
+            f"{len(missing_value)} without a condition row"
+        )
+
+    lon0, lon1 = min(lons), max(lons)
+    lat0, lat1 = min(lats), max(lats)
+    lat_mid = (lat0 + lat1) / 2.0
+    cos_mid = math.cos(math.radians(lat_mid))
+    span_x = (lon1 - lon0) * cos_mid
+    span_y = lat1 - lat0
+    scale = min((MAP_W - 2 * MAP_PAD) / span_x, (MAP_H - 2 * MAP_PAD) / span_y)
+    off_x = (MAP_W - span_x * scale) / 2.0
+    off_y = (MAP_H - span_y * scale) / 2.0
+
+    def project(lon: float, lat: float) -> tuple[float, float]:
+        return off_x + (lon - lon0) * cos_mid * scale, off_y + (lat1 - lat) * scale
+
+    def simplify(pts: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        kept: list[tuple[float, float]] = []
+        last_x = last_y = None
+        for lon, lat in pts:
+            x, y = project(lon, lat)
+            if last_x is None or abs(x - last_x) + abs(y - last_y) >= MAP_TOL:
+                kept.append((x, y))
+                last_x, last_y = x, y
+        x, y = project(*pts[-1])
+        if not kept or abs(kept[-1][0] - x) + abs(kept[-1][1] - y) > 1e-9:
+            kept.append((x, y))
+        return kept
+
+    def encode(kept: list[tuple[float, float]]) -> str:
+        """One subpath as ``M x,y`` then relative ``l dx,dy`` steps.
+
+        Coordinates are rounded to whole viewBox units once, before the deltas are taken, so the
+        error is bounded at half a unit and cannot accumulate along the line. Relative steps cost
+        about half what absolute pairs cost on 850 corridors, which is the difference between a
+        1.5 MB page and a 0.4 MB one.
+        """
+        pts = [(int(round(x)), int(round(y))) for x, y in kept]
+        if len(pts) == 1:
+            x, y = pts[0]
+            return f"M{x},{y}h1"
+        out = [f"M{pts[0][0]},{pts[0][1]}"]
+        prev_x, prev_y = pts[0]
+        for x, y in pts[1:]:
+            if x == prev_x and y == prev_y:
+                continue
+            out.append(f"l{x - prev_x},{y - prev_y}")
+            prev_x, prev_y = x, y
+        return "".join(out)
+
+    counts = dict.fromkeys(BAND_ORDER, 0)
+    drawn_vertices = 0
+    paths: list[tuple[str, str, bool, str]] = []
+    for cid in sorted(parts):
+        change = mean_change.get(cid, float("nan"))
+        band = band_of(None if pd.isna(change) else float(change))
+        counts[band] += 1
+        partial = int(usable_months.get(cid, 0)) < months_in_window
+        segments = []
+        for ring in parts[cid]:
+            kept = simplify(ring)
+            drawn_vertices += len(kept)
+            segments.append(encode(kept))
+        paths.append((cid, band, partial, "".join(segments)))
+
+    def band_label(key: str) -> str:
+        if key == "fall_hard":
+            return f"contrast falling by {outer:g} or more"
+        if key == "fall_mild":
+            return f"contrast falling by {inner:g} to {outer:g}"
+        if key == "steady":
+            return f"steady, within {inner:g} either way"
+        if key == "rise_mild":
+            return f"contrast rising by {inner:g} to {outer:g}"
+        if key == "rise_hard":
+            return f"contrast rising by {outer:g} or more"
+        return "no usable change value"
+
+    band_rows = [
+        {
+            "key": key,
+            "label": band_label(key),
+            "count": counts[key],
+            "count_label": fint(counts[key]),
+            "colour": NO_VALUE_COLOUR if key == "no_value" else BAND_COLOURS[key],
+        }
+        for key in BAND_ORDER
+    ]
+
+    facts: dict[str, Any] = {
+        "n_corridors": len(paths),
+        "n_corridors_label": fint(len(paths)),
+        "n_coloured": fint(sum(counts[k] for k in BAND_COLOURS)),
+        "n_no_value": fint(counts["no_value"]),
+        "n_partial": fint(sum(1 for p in paths if p[2])),
+        "n_fall": fint(counts["fall_hard"] + counts["fall_mild"]),
+        "n_steady": fint(counts["steady"]),
+        "n_rise": fint(counts["rise_mild"] + counts["rise_hard"]),
+        "fall_hard": fint(counts["fall_hard"]),
+        "fall_mild": fint(counts["fall_mild"]),
+        "steady": fint(counts["steady"]),
+        "rise_mild": fint(counts["rise_mild"]),
+        "rise_hard": fint(counts["rise_hard"]),
+        "inner": f"{inner:g}",
+        "outer": f"{outer:g}",
+        "p90_abs": f"{p90:.4f}",
+        "bands": band_rows,
+        "months_in_window": fint(months_in_window),
+        "window_label": f"{window[0]} to {window[-1]}",
+        "cells_missing_window": fint(cells_missing_window),
+        "cells_missing_panel": fint(len(condition) - int(condition["ndvi_contrast"].notna().sum())),
+        "source_vertices": fint(source_vertices),
+        "drawn_vertices": fint(drawn_vertices),
+        "width": MAP_W,
+        "height": MAP_H,
+        "lon_span": f1(lon1 - lon0),
+        "lat_span": f1(lat1 - lat0),
+    }
+    _MAP_LAYER = {"facts": facts, "paths": paths}
+    return _MAP_LAYER
+
+
+def svg_map(layer: dict[str, Any]) -> str:
+    facts = layer["facts"]
+    paths = layer["paths"]
+    parts = [
+        f'<rect x="0" y="0" width="{MAP_W}" height="{MAP_H}" fill="{PAPER}"/>',
+        # Dotted casings first: the corridors whose value rests on a partial record sit under
+        # every colour line rather than over it, so no corridor loses its colour.
+        "".join(
+            f'<path d="{d}" fill="none" stroke="{INK}" stroke-width="2.6" '
+            f'stroke-dasharray="1.6 2.2" stroke-opacity=".55" stroke-linecap="round"/>'
+            for _cid, band, partial, d in paths
+            if partial and band in BAND_COLOURS
+        ),
+        "".join(
+            f'<path d="{d}" fill="none" stroke="{BAND_COLOURS[band]}" stroke-width="1.5" '
+            f'stroke-linecap="round" stroke-linejoin="round"/>'
+            for _cid, band, _partial, d in paths
+            if band in BAND_COLOURS
+        ),
+        "".join(
+            f'<path d="{d}" fill="none" stroke="{NO_VALUE_COLOUR}" stroke-width="1.5" '
+            f'stroke-dasharray="3 2" stroke-linecap="round"/>'
+            for _cid, band, _partial, d in paths
+            if band == "no_value"
+        ),
+    ]
+    return (
+        f'<svg viewBox="0 0 {MAP_W} {MAP_H}" role="img" aria-labelledby="c5t c5d" class="chart">'
+        '<title id="c5t">Where the road-versus-verge contrast moved, corridor by corridor</title>'
+        '<desc id="c5d">Map of '
+        + facts["n_corridors_label"]
+        + " federal road corridors across Nigeria, coloured by mean year-over-year change in the "
+        "road-versus-verge vegetation contrast over "
+        + facts["months_in_window"]
+        + " months. "
+        + facts["fall_hard"]
+        + " corridors fell by "
+        + facts["outer"]
+        + " or more, "
+        + facts["fall_mild"]
+        + " fell by "
+        + facts["inner"]
+        + " to "
+        + facts["outer"]
+        + ", "
+        + facts["steady"]
+        + " stayed within "
+        + facts["inner"]
+        + " of zero, "
+        + facts["rise_mild"]
+        + " rose by "
+        + facts["inner"]
+        + " to "
+        + facts["outer"]
+        + " and "
+        + facts["rise_hard"]
+        + " rose by "
+        + facts["outer"]
+        + " or more. "
+        + facts["n_no_value"]
+        + " corridors carry no usable change value and are drawn in neutral grey. "
+        + facts["n_partial"]
+        + " corridors have a dotted outline because their value rests on fewer than "
+        + facts["months_in_window"]
+        + " monthly values. This is movement, not condition: the colour says how much a corridor "
+        "moved against its own history and against the national month, not how good or bad the "
+        "road is now, and it cannot rank roads against each other nationally.</desc>"
+        + "".join(parts)
+        + "</svg>"
+    )
+
+
 # --- page --------------------------------------------------------------------------------
 CSS = """
 :root { color-scheme: light; }
@@ -776,6 +1106,15 @@ a { color:#0e4d36; }
 .nonclaims { background:#f7f9fa; border-left:4px solid #6b4700; padding:.8rem 1rem;
   margin:1rem 0; }
 .nonclaims ol { margin:.4rem 0 0; padding-left:1.2rem; }
+.legend { list-style:none; margin:.7rem 0 0; padding:0; display:flex; flex-wrap:wrap;
+  gap:.35rem 1rem; font-size:.85rem; color:#1d242a; }
+.legend li { display:flex; align-items:center; gap:.45rem; margin:0; max-width:none; }
+.sw { display:inline-block; width:1.7rem; height:.5rem; border-radius:1px; flex:none; }
+.sw-dashed { border:1px dashed #4a545c; }
+.sw-dot { background:transparent; border:2px dotted #11161a; }
+.mapnote { font-size:.88rem; color:#1d242a; margin:.5rem 0 .7rem; }
+.caveat { border-left:4px solid #8c1d18; padding:.15rem 0 .15rem .8rem; margin:.7rem 0 .5rem;
+  font-size:.95rem; }
 footer { margin-top:2.6rem; border-top:1px solid #c4ccd2; padding-top:1rem;
   font-size:.82rem; color:#3d464d; }
 footer code { font-size:.8rem; word-break:break-all; }
@@ -834,6 +1173,24 @@ def render(f: dict[str, Any]) -> str:
         [name, digest] for name, digest in f["meta"]["digests"].items()
     ]
 
+    # Figure 5 — the map. The layer is cached by ``map_layer``, so this is the same projection
+    # and the same band assignment that went into ``facts``; the renderer only places it.
+    mapf = f["map"]
+    layer = map_layer()
+    legend_items = []
+    for band in mapf["bands"]:
+        extra = " sw-dashed" if band["key"] == "no_value" else ""
+        legend_items.append(
+            f'<li><span class="sw{extra}" style="background:{band["colour"]}"></span>'
+            f"{esc(band['label'])} &mdash; {band['count_label']} corridors</li>"
+        )
+    legend_items.append(
+        f'<li><span class="sw sw-dot"></span>value from fewer than '
+        f"{mapf['months_in_window']} monthly values &mdash; {mapf['n_partial']} corridors, "
+        "dotted outline</li>"
+    )
+    map_rows = [[b["label"], b["count_label"]] for b in mapf["bands"]]
+
     body = f"""
 <p class="eyebrow">RoadSense Nigeria &middot; measured <time>{esc(checks["imagery_generated"])}</time></p>
 <h1>The road condition signal does not clear its own bar</h1>
@@ -857,7 +1214,43 @@ still supports.</p>
 corridors the wrong way round, so it cannot be used to allocate maintenance, and this page
 exists to say so before anything else on it.</p>
 
-<h2>What the four charts show</h2>
+<h2>What the five figures show</h2>
+
+<figure>
+<h3>The map: movement, not condition</h3>
+<p class="mapnote">Across {mapf["n_corridors_label"]} corridors over
+{mapf["months_in_window"]} months, {mapf["n_fall"]} fell, {mapf["n_rise"]} rose and
+{mapf["n_steady"]} stayed within {mapf["inner"]} of zero either way. The spread is set by the data:
+the outer band starts at {mapf["outer"]}, the ninetieth percentile of absolute movement.</p>
+{svg_map(layer)}
+<ul class="legend">{"".join(legend_items)}</ul>
+<figcaption>
+  <p class="caveat"><strong>This shows movement, not condition.</strong> A corridor that has always
+  been poor and one that has always been good look the same here. It cannot rank roads against
+  each other nationally.</p>
+  <span class="what">Shows: the mean year-over-year change in the road-versus-verge contrast for
+  each corridor, over the {mapf["months_in_window"]} months where a year-earlier pair exists
+  ({mapf["window_label"]}). The comparison is each corridor against itself, the same calendar
+  month one year earlier, so a road's own level is differenced out and the season is held fixed:
+  a corridor that did not move sits at zero by construction, and the grey centre band reads
+  &ldquo;no change against that reference&rdquo;, never &ldquo;a good road&rdquo;.
+  {mapf["n_no_value"]} corridors have no usable change value and are drawn in neutral grey rather
+  than given a colour; {mapf["n_partial"]} rest on fewer than {mapf["months_in_window"]} monthly
+  values and carry a dotted outline. {mapf["cells_missing_window"]} corridor-months inside the
+  window carry no value and are left out, not interpolated ({mapf["cells_missing_panel"]} across
+  the whole panel). Does not show: current condition, or that a dark red corridor is in worse
+  shape today than a dark green one &mdash; only that its contrast moved further in one direction
+  over the period.</span>
+</figcaption>
+<details><summary>The same numbers as a table</summary>
+{table("Corridors by change in the road-versus-verge contrast, over the change window",
+       ["Band", "Corridors"], map_rows)}
+<p class="tablenote">The map is one SVG drawn from {mapf["source_vertices"]} source vertices,
+simplified to {mapf["drawn_vertices"]} for this page at a tolerance of about half a display
+pixel, and clipped to the corridor bounding box
+({mapf["lon_span"]} degrees of longitude, {mapf["lat_span"]} of latitude).</p>
+</details>
+</figure>
 
 <figure>
 {svg_seasonal(seasonal)}

@@ -179,6 +179,78 @@
     "n_matched": 644,
     "n_unlabelled": 578
   },
+  "map": {
+    "bands": [
+      {
+        "colour": "#7d1d10",
+        "count": 27,
+        "count_label": "27",
+        "key": "fall_hard",
+        "label": "contrast falling by 0.02 or more"
+      },
+      {
+        "colour": "#bf6f57",
+        "count": 42,
+        "count_label": "42",
+        "key": "fall_mild",
+        "label": "contrast falling by 0.01 to 0.02"
+      },
+      {
+        "colour": "#a7b1b7",
+        "count": 434,
+        "count_label": "434",
+        "key": "steady",
+        "label": "steady, within 0.01 either way"
+      },
+      {
+        "colour": "#4f8f83",
+        "count": 202,
+        "count_label": "202",
+        "key": "rise_mild",
+        "label": "contrast rising by 0.01 to 0.02"
+      },
+      {
+        "colour": "#0b4f45",
+        "count": 145,
+        "count_label": "145",
+        "key": "rise_hard",
+        "label": "contrast rising by 0.02 or more"
+      },
+      {
+        "colour": "#cfd6da",
+        "count": 0,
+        "count_label": "0",
+        "key": "no_value",
+        "label": "no usable change value"
+      }
+    ],
+    "cells_missing_panel": "183",
+    "cells_missing_window": "63",
+    "drawn_vertices": "110,003",
+    "fall_hard": "27",
+    "fall_mild": "42",
+    "height": 540,
+    "inner": "0.01",
+    "lat_span": "9.1",
+    "lon_span": "11.8",
+    "months_in_window": "10",
+    "n_coloured": "850",
+    "n_corridors": 850,
+    "n_corridors_label": "850",
+    "n_fall": "69",
+    "n_no_value": "0",
+    "n_partial": "48",
+    "n_rise": "347",
+    "n_steady": "434",
+    "outer": "0.02",
+    "p90_abs": "0.0297",
+    "rise_hard": "145",
+    "rise_mild": "202",
+    "source_vertices": "127,091",
+    "steady": "434",
+    "width": 640,
+    "window_label": "2025-09 to 2026-06"
+  },
   "meta": {
     "digests": {
       "condition.parquet": "ba49bc9b423da584",
