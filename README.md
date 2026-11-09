@@ -1,112 +1,113 @@
 # RoadSense Nigeria
 
-A degradation index and maintenance-allocation study for Nigeria's federal highway network, built
-entirely from open data at zero recurring cost.
+A reproducible, zero-cost measurement of satellite-observed change on Nigeria's 850 federal highway
+corridors — and the negative result that came out when that measurement was tested against open
+procurement records.
 
-> **Status: re-scoped after Gate G0; Phases 0–2 complete, Phase 3 built and smoke-tested on CI.
-> The national imagery run (~89 GB, 12–20 h) has not been executed yet.** Pick up from
-> [`docs/handoff.md`](docs/handoff.md).
-> The label-matching gate returned **181 high-confidence matches** against a 300 threshold. The
-> cause is a data limit rather than a code defect: GRID3 gives names to 869 corridors and leaves
-> 113,004 highway segments unnamed, so most procurement records cannot be joined to the network.
-> The project therefore models **corridors** rather than segments, leads with a satellite
-> degradation index that needs no labels, and uses the 181 interventions as an external validation
-> check. Full reasoning in [`docs/label-matching-report.md`](docs/label-matching-report.md) and
-> findings F11–F14 in [`docs/findings.md`](docs/findings.md).
+**Status**
 
-## The problem
+- **Built:** a 22-month, 10 m satellite series over all 850 corridors, plus rainfall for the same
+  corridor-months.
+- **Found:** the pre-specified test of that series against road-spending records **failed**, and the
+  point estimate points the opposite way to the hypothesis.
+- **Next:** publish the dataset (pending an account), then the map and the write-up.
+- **Cost:** $0 in recurring spend.
 
-Nigeria has roughly 36,000 km of federal roads. Maintenance is reactive — repairs follow failure,
-and allocation tracks budget cycles more than measured need. There is no public system that says
-which corridors are deteriorating fastest, or where a fixed budget buys the most.
+## The finding
 
-## The approach
+Against a pre-registered bar of AUC ≥ 0.60, the primary test returns **AUC 0.3901**, 95% interval
+**0.3196 – 0.4671**. The whole interval sits below the bar, and below 0.50: corridors that received
+maintenance money score *less* degraded on this measure than corridors that did not. The secondary
+instrument returns **0.4318** (0.3544 – 0.5137) and the raw-level reference returns **0.3133**
+(0.2461 – 0.3881). This is a null result with the sign reversed, not a weak signal to be tuned.
 
-| Step | What happens | Status |
-|---|---|---|
-| 1 | Corridor network from GRID3, merged to 850 corridors | ✅ built |
-| 2 | Intervention records from Nigeria's open procurement data | ✅ built |
-| 3 | Cloud-free monthly Sentinel-2 composites from Digital Earth Africa | 🔄 sampler proven, sharded backfill built, national run pending |
-| 4 | Rainfall and soil moisture from Open-Meteo | ⏳ Phase 3 |
-| 5 | Degradation index across all 850 corridors (no labels needed) | ⏳ Phase 5 |
-| 6 | Budget allocation with a knapsack, and the trade-off reported honestly | ⏳ Phase 6 |
+The pre-specified decision rule, written before the run, was AUC ≥ 0.60 with the bootstrap lower bound
+above 0.50; anything else is reported as a null. The test is in
+[`scripts/validate_signal_v2.py`](scripts/validate_signal_v2.py) and its spec was fixed in advance.
 
-## What this repository contains today
+### The check that caught the mistake
 
-| Path | Contents |
+The first validation score gave every fully covered corridor an identical value, because the anomaly
+it averaged is zero by construction for a corridor observed in all its own months. A score that is the
+same everywhere cannot detect anything: it ranked data coverage, not condition. A degeneracy gate now
+runs **before** any AUC and stops the run if a score has fewer than 50 distinct values, more than 20%
+of corridors on its modal value, or a standard deviation near zero. This was caught before the result
+was reported, and it is the reason the negative result above can be trusted.
+
+## How it was measured
+
+| Quantity | Value |
 |---|---|
-| `src/roadsense/` | Package: matching (`textmatch`, `states`, `gate0`), ingestion (`grid3`, `ocds`), modelling units (`corridors`, `geometry`), imagery (`tiles`, `sampler`, `netcount`), storage (`hf`, `warehouse`) |
-| `scripts/run_gate0.py` | Downloads sources, matches labels, writes the gate report |
-| `scripts/build_corridors.py` | Builds the 850-corridor modelling table |
-| `scripts/build_geometry.py` | Builds corridor geometry as GeoJSON (2.74 MB raw, 0.64 MB gzipped) |
-| `scripts/publish_dataset.py` | Packages parquet + dataset card, optionally uploads |
-| `scripts/check_warehouse.py` | Verifies the DuckDB views and prints headline counts |
-| `scripts/count_tiles.py` | Counts the 8 km imagery tiles that actually contain highway |
-| `scripts/sample_pilot.py` | One-state imagery pilot with exact byte accounting |
-| `scripts/ablate_resolution.py` | 10 m vs 40 m comparison for the condition signal |
-| `scripts/backfill.py` | Sharded, resumable national imagery backfill |
-| `tests/` | 64 tests over matching, states, corridors, geometry, imagery, dataset access, warehouse |
-| `docs/findings.md` | Every measured finding, with dates, sources and what changed as a result |
-| `docs/handoff.md` | **Start here** — state, runtime, credentials, decisions, traps |
-| `docs/phases.md` | Build phases, dependencies and current status |
-| `docs/pilot-report.md` | Generated imagery pilot measurements |
-| `docs/resolution-ablation.md` | Generated 10 m vs 40 m comparison |
-| `preflight-spec.md` | Agreed scope, thresholds and decisions |
+| Corridor network | 850 corridors, 18,419 km |
+| Measurement period | 22 months, 2024-09 … 2026-06 |
+| Satellite readings | 69,212 corridor-tile-month observations, 10 m, three bands |
+| Readings per month | 3,146, covering all 850 corridors every month |
+| Blank readings | 378 (0.55%) — left blank, never filled or interpolated |
+| Collection | 11 independent two-month workflow runs, 96 shards each, ~70 GB streamed by measured byte rates, $0 |
+| Weather | 18,700 corridor-months over 82 grid cells, 0 missing days |
+| Condition series | 18,700 corridor-months, corridor and month level removed |
+| Variance split | corridor 81.1%, month 6.6%, residual 12.6% |
+| Validation (primary) | AUC 0.3901, 95% interval 0.3196 – 0.4671, bar 0.60 |
+| Validation (secondary) | AUC 0.4318, interval 0.3544 – 0.5137 |
+| Reference (raw contrast, confounded) | AUC 0.3133, interval 0.2461 – 0.3881 |
 
-## Quickstart
+The 378 blanks matter: they are months where the composite had no usable pixel, and they are reported
+as blanks rather than imputed. The 0.55% rate is low enough that coverage is not the explanation for
+the result.
+
+## Reproduce it
+
+The first two commands need no data download and no credentials.
 
 ```bash
 python -m pip install -e ".[dev]"
-python -m pytest tests -q                       # 64 tests, no network
-
-python scripts/run_gate0.py                     # ~65 MB of sources, then matching
-python scripts/build_corridors.py
-python scripts/build_geometry.py                # corridor GeoJSON for the map
-python scripts/publish_dataset.py               # parquet + dataset card in dist/dataset
-python scripts/check_warehouse.py               # DuckDB counts: 850 corridors, 2,036 events
+python -m pytest tests -q                       # no network, no credentials
 
 python scripts/count_tiles.py                   # 2,016 imagery tiles, no download
-python scripts/sample_pilot.py                  # measures real bytes for one state
-python scripts/ablate_resolution.py             # 10 m vs 40 m, writes docs/resolution-ablation.md
-python scripts/backfill.py --shard 1/48 --dry-run   # plan a shard without downloading
+python scripts/run_gate0.py                     # ~65 MB of open sources, then matching
+python scripts/build_corridors.py               # -> data/interim/corridors.csv, 850 rows
+python scripts/build_geometry.py
+python scripts/collect_imagery.py               # merge downloaded per-window artifacts, with coverage checks
+python scripts/build_weather.py                 # Open-Meteo archive, no key required
+python scripts/build_condition.py               # -> data/interim/condition.parquet
+python scripts/validate_signal_v2.py            # pre-specified test -> data/interim/validation_v2.json
 ```
 
-`publish_dataset.py --upload` pushes to Hugging Face and needs `HF_TOKEN`. Reading the dataset
-never does — the published files are public and served over plain HTTPS.
+The imagery behind the series is collected by workflow, not by hand:
+`gh workflow run backfill.yml -f resolution=10 -f shards=96`, once per two-month window. Each run
+streams its window and stores nothing.
 
-## Data
+## What this does not claim
 
-Derived tables live at [`roadsense-ng/nigeria-roads`](https://huggingface.co/datasets/roadsense-ng/nigeria-roads)
-on Hugging Face Datasets: `corridors.parquet`, `events.parquet`, `label_matches.parquet`.
+- **Movement, not condition.** The measure is a satellite contrast between the carriageway and its
+  verge. It observes change in reflectance; it is not a pavement rating or a roughness survey.
+- **Reanalysis, not gauges.** Rainfall is a gridded reanalysis product on 1° cells, not station data.
+- **An observational comparison with 66 positives.** Corridors that received money are compared with
+  those that did not. Nothing here is randomised and nothing here is causal.
+- **No accuracy claim.** The only validated quantity is the AUC above, and it is below chance for this
+  label.
+- **Procurement is spending, not failure.** A maintenance record means money was allocated; it does not
+  mean the road physically failed.
+- **Dataset publishing: pending.** The tables are not on Hugging Face yet, so there is deliberately no
+  download link on this page.
 
-```python
-import pandas as pd
-BASE = "https://huggingface.co/datasets/roadsense-ng/nigeria-roads/resolve/main"
-corridors = pd.read_parquet(f"{BASE}/corridors.parquet")
-```
+## Repository map
 
-Hugging Face is not a preference: Cloudflare R2 requires a payment method on the account to
-enable, even on the free tier, so it would break the project's no-card rule (findings F5).
+| Path | Contents |
+|---|---|
+| `src/roadsense/` | Package: matching (`textmatch`, `states`, `gate0`), ingestion (`grid3`, `ocds`), corridors and geometry, imagery (`tiles`, `sampler`, `netcount`), storage (`hf`, `warehouse`) |
+| `scripts/` | Thin CLI entry points, one per pipeline stage |
+| `tests/` | Unit tests over matching, states, corridors, geometry, imagery, dataset access, warehouse |
+| `docs/` | Findings, phases, handoff, generated gate and pilot reports |
+| `preflight-spec.md` | Agreed scope, thresholds and decisions, committed before the tests ran |
 
-## Honest limitations
+## Read further
 
-- A procurement record is evidence that **money was spent**, not that a road physically failed. The
-  target is intervention need, and that is a proxy.
-- GRID3 names only **869 corridors**; 113,004 highway segments have no name at all, so they can
-  never be joined to a label textually.
-- The procurement source has **no coordinates** and **no 2022 records**. Half of all maintenance
-  events (997 of 2,036) fall in 2025, which is also the temporal test year.
-- The apparent 2024 procurement spike is **40% new construction and 34% noise** once classified;
-  the maintenance series is far flatter than the raw counts suggest (findings F13).
-- Traffic volume has no free Nigerian source, so any "value" term must be a labelled proxy.
-- Open-Meteo's free tier is **non-commercial use only**.
-- Sampling NDVI on a road centreline gives ≈ 0: a 40 m pixel is mostly asphalt. The signal has to
-  be a road-versus-verge contrast, which is a Phase 4 design change (findings F17).
-- The road-condition signal needs **10 m** imagery (~70 GB, ~281 h serial), not 40 m: at 40 m the
-  verge contrast flips sign on one corridor-month in five (findings F19). A coarse landscape index
-  would be fine at 40 m, but that is not what the project is for.
-- The plan's original imagery cost estimate was off by ~9×; per-tile bytes are now measured, not
-  inferred (findings F16).
+- [`docs/handoff.md`](docs/handoff.md) — current state, runtime, credentials, traps. Start here.
+- [`docs/findings.md`](docs/findings.md) — every measured fact, with its date and source.
+- [`docs/phases.md`](docs/phases.md) — what is built, what failed, what is next.
+- [`docs/label-matching-report.md`](docs/label-matching-report.md) — why the label gate failed and the
+  project moved to corridors.
 
 ## Licence
 

@@ -17,6 +17,15 @@ overlap only where stated. If a phase slips, cut scope from the end of the plan 
 | 6 | Optimisation | ⏳ | Phase 5 |
 | 7 | Serving | ⏳ | Phase 6 |
 | 8 | Documentation + demo | ⏳ | Phase 7 |
+| 9 | **Public audit** — report, dataset, tests | ▶ start 2026-11-09 | 2, 3 |
+| 10 | **The map** — inside the report | ⏳ | 9 |
+| 11 | **The write-up** — article, then preprint | ⏳ | 9 |
+
+**Re-scoped 2026-11-09.** Phase 5 (modelling) cannot proceed on the evidence. Two pre-specified
+tests were run against the completed 22-month measurement; both failed, the second with the sign
+reversed and its whole interval below 0.50 (`docs/handoff.md`, `.agent/T19-report.md`). The plan
+therefore leads with what was actually established — a complete, reproducible national measurement
+and a pre-registered negative result — rather than with a model that would not survive review.
 
 ---
 
@@ -186,3 +195,51 @@ why the signal is weak. Model card written.
 
 **Exit criterion:** deliverables checklist in `preflight-spec.md` §9 fully present; cold clone runs
 end to end following the README alone.
+
+---
+
+## Phase 9 — Public audit (Route A) ▶
+
+**Goal:** one URL a stranger can open and, in sixty seconds, understand what was asked, what was
+measured, what was found, and that they can re-run it. The deliverable is not a claim of success; it
+is evidence of judgement.
+
+Four charts carry the whole story:
+
+1. **The seasonal trap** — the 42% September→December fall with no road changing (F22).
+2. **The broken instrument** — 726 corridors, one identical score. A flat line, drawn.
+3. **The two tests** — both below 0.60, with intervals, the second pointing the wrong way.
+4. **The variance split** — 81% corridor, 6.6% month, 12.6% left for condition.
+
+| # | Task | Output | Done when |
+|---|---|---|---|
+| A1 | Turn the throwaway falsification tests into repo tests | `tests/test_collect_imagery.py` | `pytest` fails when the month-drift or short-month guard is removed |
+| A2 | Rewrite the README's first screen as the portfolio summary | `README.md` | The question, the result and the reproduction command all appear above the fold |
+| A3 | Generate the report page from code | `docs/publish/index.html` + figure scripts | Every figure and number is produced by a script, never typed |
+| A4 | Publish the dataset | Hugging Face dataset + card | Anonymous fetch works; needs an account (owner action) |
+| A5 | Link it all | README → report → dataset | One click path, no dead links |
+
+**Exit criterion:** a cold clone runs the pipeline; the published page's numbers reproduce from the
+published data; the negative result is stated before any number appears.
+
+## Phase 10 — The map (Route B) ⏳
+
+**Goal:** corridors coloured by measured change, inside the report — not a separate toy.
+
+- Static MapLibre page, no server.
+- Every colour carries the caveat that it shows **movement, not condition** (T16: the score has no
+  level; always-bad and always-good corridors are indistinguishable).
+- Show the 183 missing corridor-months rather than painting over them.
+
+**Exit criterion:** renders at 375 px and 1440 px; a reader cannot mistake it for a condition ranking.
+
+## Phase 11 — The write-up (Route C) ⏳
+
+**Goal:** the argument, in prose, for someone who will never clone the repo.
+
+- 1,200-word article: what was asked, what was measured, the two instruments and why both failed,
+  what survives.
+- Then, if the reception warrants it, a preprint or workshop submission with a proper literature
+  review — not before, because a preprint without a review is a blog post with a citation format.
+
+**Exit criterion:** the article's every number traces to a figure on the report page.
