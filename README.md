@@ -10,10 +10,12 @@ procurement records.
   corridor-months.
 - **Found:** the pre-specified test of that series against road-spending records **failed**, and the
   point estimate points the opposite way to the hypothesis.
-- **Next:** publish the dataset (pending an account), then the map and the write-up.
+- **Next:** the article, then the polish pass.
 - **Cost:** $0 in recurring spend.
-- **The report:** [`docs/publish/index.html`](docs/publish/index.html) — four charts, the method, and
+- **The report:** [batestguy.github.io/roadsense-nigeria/publish](https://batestguy.github.io/roadsense-nigeria/publish/) — five charts, the method, and
   what this does not claim.
+- **The data:** [JBZABC/roadsense-nigeria](https://huggingface.co/datasets/JBZABC/roadsense-nigeria) —
+  five tables, four manifests, and a card that states the negative result first.
 
 ## The finding
 
@@ -90,8 +92,10 @@ streams its window and stores nothing.
   label.
 - **Procurement is spending, not failure.** A maintenance record means money was allocated; it does not
   mean the road physically failed.
-- **Dataset publishing: pending.** The tables are not on Hugging Face yet, so there is deliberately no
-  download link on this page.
+- **One licence restriction worth reading.** The reanalysis weather is free for
+  **non-commercial** use. The code is MIT and the derived satellite tables follow GRID3's CC BY-SA;
+  the weather terms are narrower than the rest, and a commercial deployment would break them. It is
+  stated on the dataset card, not buried here.
 
 ## Repository map
 
@@ -105,6 +109,8 @@ streams its window and stores nothing.
 
 ## Read further
 
+- **The article:** [`docs/article.md`](docs/article.md) — the same argument in prose, for someone who
+  will never clone this repository.
 - [`docs/handoff.md`](docs/handoff.md) — current state, runtime, credentials, traps. Start here.
 - [`docs/findings.md`](docs/findings.md) — every measured fact, with its date and source.
 - [`docs/phases.md`](docs/phases.md) — what is built, what failed, what is next.

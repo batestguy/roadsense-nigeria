@@ -17,9 +17,9 @@ overlap only where stated. If a phase slips, cut scope from the end of the plan 
 | 6 | Optimisation | ⏳ | Phase 5 |
 | 7 | Serving | ⏳ | Phase 6 |
 | 8 | Documentation + demo | ⏳ | Phase 7 |
-| 9 | **Public audit** — report, dataset, tests | ▶ start 2026-11-09 | 2, 3 |
-| 10 | **The map** — inside the report | ⏳ | 9 |
-| 11 | **The write-up** — article, then preprint | ⏳ | 9 |
+| 9 | **Public audit** — report, dataset, tests | ✅ complete 2026-11-09 | 2, 3 |
+| 10 | **The map** — inside the report | ✅ complete 2026-11-09 | 9 |
+| 11 | **The write-up** — article, then preprint | 🔄 article in progress | 9 |
 
 **Re-scoped 2026-11-09.** Phase 5 (modelling) cannot proceed on the evidence. Two pre-specified
 tests were run against the completed 22-month measurement; both failed, the second with the sign
@@ -224,6 +224,13 @@ Four charts carry the whole story:
 **Exit criterion:** a cold clone runs the pipeline; the published page's numbers reproduce from the
 published data; the negative result is stated before any number appears.
 
+**Met 2026-11-09.** Page at
+<https://batestguy.github.io/roadsense-nigeria/publish/>, data at
+<https://huggingface.co/datasets/JBZABC/roadsense-nigeria> (anonymous download verified with the
+token disabled), 91 tests passing in CI on Python 3.12 and 3.13. Two defects were found by rendering
+the page rather than reading the code: wide tables that could not be reached by keyboard, and an axis
+note clipped at phone width. Both fixed and re-measured.
+
 ## Phase 10 — The map (Route B) ⏳
 
 **Goal:** corridors coloured by measured change, inside the report — not a separate toy.
@@ -234,6 +241,9 @@ published data; the negative result is stated before any number appears.
 - Show the 183 missing corridor-months rather than painting over them.
 
 **Exit criterion:** renders at 375 px and 1440 px; a reader cannot mistake it for a condition ranking.
+
+**Met 2026-11-09.** Measured at both widths: no horizontal overflow, no clipped text, no console
+errors. The movement-not-condition sentence is inside the figure's own caption.
 
 ## Phase 11 — The write-up (Route C) ⏳
 
