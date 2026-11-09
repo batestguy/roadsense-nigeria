@@ -206,10 +206,12 @@ is evidence of judgement.
 
 Four charts carry the whole story:
 
-1. **The seasonal trap** — the 42% September→December fall with no road changing (F22).
+1. **The seasonal trap** — the September→December fall with no road changing: 38.3% on corridor
+   means over 22 months (F22 measured 42% on tile-row means over four months).
 2. **The broken instrument** — 726 corridors, one identical score. A flat line, drawn.
 3. **The two tests** — both below 0.60, with intervals, the second pointing the wrong way.
-4. **The variance split** — 81% corridor, 6.6% month, 12.6% left for condition.
+4. **The variance split** — month 5.9%, corridor 81.2%, residual 12.8% (month entered first, then
+   corridor; the order is stated because the split is order-dependent).
 
 | # | Task | Output | Done when |
 |---|---|---|---|

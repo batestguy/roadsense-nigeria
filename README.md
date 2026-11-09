@@ -12,6 +12,8 @@ procurement records.
   point estimate points the opposite way to the hypothesis.
 - **Next:** publish the dataset (pending an account), then the map and the write-up.
 - **Cost:** $0 in recurring spend.
+- **The report:** [`docs/publish/index.html`](docs/publish/index.html) — four charts, the method, and
+  what this does not claim.
 
 ## The finding
 
@@ -46,7 +48,7 @@ was reported, and it is the reason the negative result above can be trusted.
 | Collection | 11 independent two-month workflow runs, 96 shards each, ~70 GB streamed by measured byte rates, $0 |
 | Weather | 18,700 corridor-months over 82 grid cells, 0 missing days |
 | Condition series | 18,700 corridor-months, corridor and month level removed |
-| Variance split | corridor 81.1%, month 6.6%, residual 12.6% |
+| Variance split | month 5.9%, corridor 81.2%, residual 12.8% (month entered first) |
 | Validation (primary) | AUC 0.3901, 95% interval 0.3196 – 0.4671, bar 0.60 |
 | Validation (secondary) | AUC 0.4318, interval 0.3544 – 0.5137 |
 | Reference (raw contrast, confounded) | AUC 0.3133, interval 0.2461 – 0.3881 |

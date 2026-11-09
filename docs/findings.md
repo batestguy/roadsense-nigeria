@@ -721,6 +721,12 @@ table a reader could compare across seasons.
 This is cheap to honour because the backfill stores one row per corridor per tile per month, so a
 seasonal baseline is a group-by, not another ingestion job.
 
+**Recomputed on the complete 22-month series (measured 2026-11-09).** The 42% above came from
+tile-row means over four months. On corridor means across all 22 months the September→December fall
+is **38.3%** (0.1156 → 0.0713), and the variance decomposition, entering month first then corridor,
+is **month 5.9%, corridor 81.2%, residual 12.8%**. The split is order-dependent: entering corridor
+first gives 82.1 / 5.1 / 12.8. Both the figure and the order are stated wherever it is quoted.
+
 ---
 
 ## F10 — Findings that are still open

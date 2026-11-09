@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoadSense Nigeria &mdash; the corridor condition signal does not clear its bar</title>
+<meta name="description" content="One page: what was measured on Nigeria's federal road
+corridors, why the condition signal failed its pre-specified test, and what it still
+supports.">
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin:0; background:#ffffff; color:#11161a;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height:1.55; font-size:1rem; }
+.skip { position:absolute; left:-999px; top:0; background:#ffffff; color:#11161a;
+  padding:.6rem 1rem; z-index:10; }
+.skip:focus { left:.5rem; top:.5rem; outline:3px solid #0e4d36; }
+main { max-width:74ch; margin:0 auto; padding:1.25rem 1rem 3rem; }
+h1 { font-size:1.6rem; line-height:1.25; margin:.2rem 0 .6rem; letter-spacing:-.01em; }
+h2 { font-size:1.15rem; margin:2.2rem 0 .5rem; border-bottom:1px solid #c4ccd2;
+  padding-bottom:.3rem; }
+h3 { font-size:1rem; margin:1.4rem 0 .3rem; }
+p, li { max-width:70ch; }
+.lede { font-size:1.05rem; color:#1d242a; }
+.eyebrow { text-transform:uppercase; letter-spacing:.08em; font-size:.75rem;
+  color:#4a545c; margin:0 0 .4rem; }
+.finding { border:2px solid #11161a; border-left-width:8px; padding:1rem 1.1rem;
+  margin:1.4rem 0 1.8rem; background:#f7f9fa; }
+.finding .score { font-size:2.6rem; font-weight:700; line-height:1; margin:0; }
+.finding .score .unit { font-size:1rem; font-weight:400; color:#4a545c;
+  display:block; margin-top:.35rem; }
+.finding dl { margin:.9rem 0 0; display:grid; grid-template-columns:auto 1fr;
+  gap:.25rem .9rem; font-size:.95rem; }
+.finding dt { color:#4a545c; }
+.finding dd { margin:0; font-weight:600; }
+figure { margin:1.6rem 0 2rem; }
+figure svg.chart { width:100%; height:auto; display:block; background:#ffffff;
+  border:1px solid #c4ccd2; }
+figcaption { margin-top:.55rem; font-size:.92rem; color:#1d242a; }
+figcaption .what { display:block; color:#4a545c; }
+.tblwrap { overflow-x:auto; margin-top:.7rem; }
+.tblwrap:focus-visible { outline:3px solid #8c1d18; outline-offset:2px; }
+table { border-collapse:collapse; font-size:.88rem; min-width:26rem; width:100%; }
+caption { text-align:left; font-size:.85rem; color:#4a545c; padding-bottom:.35rem; }
+th, td { border-bottom:1px solid #c4ccd2; padding:.3rem .5rem; text-align:right; }
+th:first-child, td:first-child { text-align:left; }
+thead th { border-bottom:2px solid #11161a; }
+details { margin-top:.6rem; font-size:.9rem; }
+summary { cursor:pointer; color:#0e4d36; text-decoration:underline; padding:.2rem 0; }
+summary:focus-visible, a:focus-visible { outline:3px solid #8c1d18; outline-offset:2px; }
+a { color:#0e4d36; }
+.tablenote { font-size:.85rem; color:#4a545c; margin:.45rem 0 0; }
+.nonclaims { background:#f7f9fa; border-left:4px solid #6b4700; padding:.8rem 1rem;
+  margin:1rem 0; }
+.nonclaims ol { margin:.4rem 0 0; padding-left:1.2rem; }
+footer { margin-top:2.6rem; border-top:1px solid #c4ccd2; padding-top:1rem;
+  font-size:.82rem; color:#3d464d; }
+footer code { font-size:.8rem; word-break:break-all; }
+@media (max-width:26rem) {
+  h1 { font-size:1.35rem; }
+  .finding .score { font-size:2.1rem; }
+  .finding dl { grid-template-columns:1fr; }
+  .finding dd { margin-bottom:.5rem; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<main id="main">
+<p class="eyebrow">RoadSense Nigeria &middot; measured <time>2026-11-09</time></p>
+<h1>The road condition signal does not clear its own bar</h1>
+<p class="lede">One page on what this project measured across 850
+federal road corridors, why the measurement failed its pre-specified test, and what it
+still supports.</p>
+
+<div class="finding">
+  <p class="score">0.3901<span class="unit">area under the curve, primary instrument</span></p>
+  <dl>
+    <dt>Interval</dt><dd>0.3196 to 0.4671</dd>
+    <dt>Bar to clear</dt><dd>0.60 point estimate, with the lower bound above 0.50</dd>
+    <dt>Direction</dt><dd>below chance (0.50): corridors with recorded spending
+      score as <em>less</em> degraded than those without</dd>
+    <dt>Sample</dt><dd>644 corridors analysed,
+      66 with a label, 578 without</dd>
+  </dl>
+</div>
+
+<p>The result is not "the effect is small". It is that the instrument ranks the labelled
+corridors the wrong way round, so it cannot be used to allocate maintenance, and this page
+exists to say so before anything else on it.</p>
+
+<h2>What the four charts show</h2>
+
+<figure>
+<svg viewBox="0 0 440 250" role="img" aria-labelledby="c1t c1d" class="chart"><title id="c1t">Seasonal fall in the road-versus-verge contrast</title><desc id="c1d">Line chart of the national monthly mean contrast over twenty-two months. It rises to a peak of 0.1330 and falls to 0.0647, dropping 38.3 per cent between 2024-09 and 2024-12.</desc><text x="46" y="14" font-size="12" fill="#4a545c">Mean road-minus-verge NDVI contrast, national, by month</text><line x1="46" y1="186" x2="428" y2="186" stroke="#4a545c" stroke-width="1"/><line x1="46" y1="186.0" x2="428" y2="186.0" stroke="#c4ccd2" stroke-width="1"/><text x="40" y="190.0" font-size="12" fill="#4a545c" text-anchor="end">0.06</text><line x1="46" y1="127.5" x2="428" y2="127.5" stroke="#c4ccd2" stroke-width="1"/><text x="40" y="131.5" font-size="12" fill="#4a545c" text-anchor="end">0.09</text><line x1="46" y1="30.0" x2="428" y2="30.0" stroke="#c4ccd2" stroke-width="1"/><text x="40" y="34.0" font-size="12" fill="#4a545c" text-anchor="end">0.14</text><polyline points="46.0,77.6 64.2,117.5 82.4,144.2 100.6,163.9 118.8,176.8 137.0,164.9 155.1,134.7 173.3,114.9 191.5,103.5 209.7,84.5 227.9,60.6 246.1,43.7 264.3,62.2 282.5,93.4 300.7,124.8 318.9,144.2 337.0,156.5 355.2,149.9 373.4,127.2 391.6,104.6 409.8,88.3 428.0,62.5" fill="none" stroke="#0e4d36" stroke-width="2"/><circle cx="46.0" cy="77.6" r="2.4" fill="#0e4d36"/><circle cx="64.2" cy="117.5" r="2.4" fill="#0e4d36"/><circle cx="82.4" cy="144.2" r="2.4" fill="#0e4d36"/><circle cx="100.6" cy="163.9" r="2.4" fill="#0e4d36"/><circle cx="118.8" cy="176.8" r="2.4" fill="#0e4d36"/><circle cx="137.0" cy="164.9" r="2.4" fill="#0e4d36"/><circle cx="155.1" cy="134.7" r="2.4" fill="#0e4d36"/><circle cx="173.3" cy="114.9" r="2.4" fill="#0e4d36"/><circle cx="191.5" cy="103.5" r="2.4" fill="#0e4d36"/><circle cx="209.7" cy="84.5" r="2.4" fill="#0e4d36"/><circle cx="227.9" cy="60.6" r="2.4" fill="#0e4d36"/><circle cx="246.1" cy="43.7" r="2.4" fill="#0e4d36"/><circle cx="264.3" cy="62.2" r="2.4" fill="#0e4d36"/><circle cx="282.5" cy="93.4" r="2.4" fill="#0e4d36"/><circle cx="300.7" cy="124.8" r="2.4" fill="#0e4d36"/><circle cx="318.9" cy="144.2" r="2.4" fill="#0e4d36"/><circle cx="337.0" cy="156.5" r="2.4" fill="#0e4d36"/><circle cx="355.2" cy="149.9" r="2.4" fill="#0e4d36"/><circle cx="373.4" cy="127.2" r="2.4" fill="#0e4d36"/><circle cx="391.6" cy="104.6" r="2.4" fill="#0e4d36"/><circle cx="409.8" cy="88.3" r="2.4" fill="#0e4d36"/><circle cx="428.0" cy="62.5" r="2.4" fill="#0e4d36"/><circle cx="46.0" cy="77.6" r="4.2" fill="#ffffff" stroke="#8c1d18" stroke-width="2"/><text x="46.0" y="67.6" font-size="12" fill="#11161a" text-anchor="middle">0.116</text><circle cx="100.6" cy="163.9" r="4.2" fill="#ffffff" stroke="#8c1d18" stroke-width="2"/><text x="100.6" y="153.9" font-size="12" fill="#11161a" text-anchor="middle">0.071</text><text x="73.3" y="116.8" font-size="12" fill="#8c1d18" text-anchor="middle" font-weight="bold">falls 38.3%</text><text x="46.0" y="202" font-size="11" fill="#4a545c" text-anchor="middle">2024-09</text><text x="118.8" y="202" font-size="11" fill="#4a545c" text-anchor="middle">2025-01</text><text x="191.5" y="202" font-size="11" fill="#4a545c" text-anchor="middle">2025-05</text><text x="264.3" y="202" font-size="11" fill="#4a545c" text-anchor="middle">2025-09</text><text x="337.0" y="202" font-size="11" fill="#4a545c" text-anchor="middle">2026-01</text><text x="409.8" y="202" font-size="11" fill="#4a545c" text-anchor="middle">2026-05</text></svg>
+<figcaption>
+  <strong>The seasonal trap.</strong>
+  <span class="what">Shows: the raw contrast falls 38.3 per cent on corridor
+  means over the full 22 months, from
+  2024-09 to 2024-12, with no road changing
+  (F22 measured 42 per cent on tile-row means over the first four months).
+  The two measures answer the same question on different rows and are not interchangeable.
+  Does not show: that any corridor deteriorated, or that the road itself changed.</span>
+</figcaption>
+<details><summary>The same numbers as a table</summary>
+<div class="tblwrap" tabindex="0" role="region" aria-label="Table, scrollable sideways on narrow screens"><table><caption>National mean of road-minus-verge NDVI contrast, by month</caption><thead><tr><th scope="col">Month</th><th scope="col">Mean contrast</th></tr></thead><tbody><tr><td>2024-09</td><td>0.1156</td></tr><tr><td>2024-10</td><td>0.0951</td></tr><tr><td>2024-11</td><td>0.0814</td></tr><tr><td>2024-12</td><td>0.0713</td></tr><tr><td>2025-01</td><td>0.0647</td></tr><tr><td>2025-02</td><td>0.0708</td></tr><tr><td>2025-03</td><td>0.0863</td></tr><tr><td>2025-04</td><td>0.0965</td></tr><tr><td>2025-05</td><td>0.1023</td></tr><tr><td>2025-06</td><td>0.1121</td></tr><tr><td>2025-07</td><td>0.1243</td></tr><tr><td>2025-08</td><td>0.1330</td></tr><tr><td>2025-09</td><td>0.1235</td></tr><tr><td>2025-10</td><td>0.1075</td></tr><tr><td>2025-11</td><td>0.0914</td></tr><tr><td>2025-12</td><td>0.0814</td></tr><tr><td>2026-01</td><td>0.0751</td></tr><tr><td>2026-02</td><td>0.0785</td></tr><tr><td>2026-03</td><td>0.0902</td></tr><tr><td>2026-04</td><td>0.1017</td></tr><tr><td>2026-05</td><td>0.1101</td></tr><tr><td>2026-06</td><td>0.1233</td></tr></tbody></table></div>
+</details>
+</figure>
+
+<figure>
+<svg viewBox="0 0 440 240" role="img" aria-labelledby="c2t c2d" class="chart"><title id="c2t">The first test score collapses onto a single value</title><desc id="c2d">Histogram of the score over 850 corridors. 726 corridors share one value, 0.000241, the spread inside that group being floating-point noise at 7.9e-18; every other bar is a sliver.</desc><text x="46" y="16" font-size="12" fill="#4a545c">Corridors by value of the first test's score</text><line x1="46" y1="180" x2="428" y2="180" stroke="#4a545c"/><line x1="46" y1="180.0" x2="428" y2="180.0" stroke="#c4ccd2" stroke-dasharray="3 3"/><text x="40" y="184.0" font-size="12" fill="#4a545c" text-anchor="end">0</text><line x1="46" y1="30.0" x2="428" y2="30.0" stroke="#c4ccd2" stroke-dasharray="3 3"/><text x="40" y="34.0" font-size="12" fill="#4a545c" text-anchor="end">850</text><rect x="46.5" y="179.8" width="17.6" height="0.2" fill="#4a545c"/><rect x="103.8" y="179.6" width="17.6" height="0.4" fill="#4a545c"/><rect x="161.1" y="179.8" width="17.6" height="0.2" fill="#4a545c"/><rect x="180.2" y="179.6" width="17.6" height="0.4" fill="#4a545c"/><rect x="199.3" y="179.5" width="17.6" height="0.5" fill="#4a545c"/><rect x="218.4" y="177.5" width="17.6" height="2.5" fill="#4a545c"/><rect x="237.5" y="178.8" width="17.6" height="1.2" fill="#4a545c"/><rect x="256.6" y="179.6" width="17.6" height="0.4" fill="#4a545c"/><rect x="275.7" y="179.3" width="17.6" height="0.7" fill="#4a545c"/><rect x="294.8" y="179.3" width="17.6" height="0.7" fill="#4a545c"/><rect x="313.9" y="166.4" width="17.6" height="13.6" fill="#4a545c"/><rect x="333.0" y="179.3" width="17.6" height="0.7" fill="#4a545c"/><rect x="371.2" y="51.9" width="17.6" height="128.1" fill="#0e4d36"/><text x="380.3" y="45.9" font-size="12" fill="#11161a" text-anchor="middle">726 (85.4)</text><rect x="390.3" y="179.8" width="17.6" height="0.2" fill="#4a545c"/><rect x="409.4" y="179.6" width="17.6" height="0.4" fill="#4a545c"/><text x="46" y="196" font-size="11" fill="#4a545c" text-anchor="start">-0.0071</text><text x="428" y="196" font-size="11" fill="#4a545c" text-anchor="end">0.0015</text><text x="46" y="230" font-size="11" fill="#4a545c">Score: minus the mean two-way residual, per corridor</text></svg>
+<figcaption>
+  <strong>The broken instrument.</strong>
+  <span class="what">Shows: 726 of
+  850 corridors (85.4) share one and the same
+  value, 0.000241, and the spread inside that group is floating-point noise
+  (7.9e-18). This is the score the first test used; it could not have
+  detected anything, because a score that takes one value on most of the sample has no ranking
+  to give. A gate now refuses to run an area under the curve before checking that the score
+  can vary at all. Does not show: that the three instruments in the next chart are broken; they
+  are continuous, and that gate passed for all three.</span>
+</figcaption>
+<details><summary>The same numbers as a table</summary>
+<div class="tblwrap" tabindex="0" role="region" aria-label="Table, scrollable sideways on narrow screens"><table><caption>Corridors by value of the first test&#x27;s score, the most common values first</caption><thead><tr><th scope="col">Score value</th><th scope="col">Corridors</th></tr></thead><tbody><tr><td>0.000241</td><td>726</td></tr><tr><td>-0.001054</td><td>60</td></tr><tr><td>-0.001008</td><td>17</td></tr><tr><td>-0.002912</td><td>12</td></tr><tr><td>-0.002431</td><td>7</td></tr><tr><td>every other value</td><td>28</td></tr></tbody></table></div>
+<p class="tablenote">Distinct values at full precision:
+168 across 850 scored corridors;
+histogram drawn with 20 equal bins between -0.0071 and
+0.0015.</p>
+</details>
+</figure>
+
+<figure>
+<svg viewBox="0 0 460 250" role="img" aria-labelledby="c3t c3d" class="chart"><title id="c3t">Three instruments against the chance line and the bar</title><desc id="c3d">Forest plot with a point and a ninety-five per cent interval for each instrument. All three points and all three intervals lie to the left of both the chance line and the bar.</desc><rect x="382.0" y="32" width="58.0" height="154" fill="#e3e8ea"/><text x="386.0" y="26" font-size="11" fill="#4a545c">clears the bar</text><line x1="150.0" y1="32" x2="150.0" y2="186" stroke="#c4ccd2" stroke-dasharray="2 4"/><text x="150.0" y="202" font-size="11" fill="#4a545c" text-anchor="middle">0.20</text><line x1="208.0" y1="32" x2="208.0" y2="186" stroke="#c4ccd2" stroke-dasharray="2 4"/><text x="208.0" y="202" font-size="11" fill="#4a545c" text-anchor="middle">0.30</text><line x1="266.0" y1="32" x2="266.0" y2="186" stroke="#c4ccd2" stroke-dasharray="2 4"/><text x="266.0" y="202" font-size="11" fill="#4a545c" text-anchor="middle">0.40</text><line x1="324.0" y1="32" x2="324.0" y2="186" stroke="#c4ccd2" stroke-dasharray="2 4"/><text x="324.0" y="202" font-size="11" fill="#4a545c" text-anchor="middle">0.50</text><line x1="382.0" y1="32" x2="382.0" y2="186" stroke="#c4ccd2" stroke-dasharray="2 4"/><text x="382.0" y="202" font-size="11" fill="#4a545c" text-anchor="middle">0.60</text><line x1="440.0" y1="32" x2="440.0" y2="186" stroke="#c4ccd2" stroke-dasharray="2 4"/><text x="440.0" y="202" font-size="11" fill="#4a545c" text-anchor="middle">0.70</text><line x1="324.0" y1="32" x2="324.0" y2="186" stroke="#11161a" stroke-width="1"/><text x="320.0" y="14" font-size="11" fill="#11161a" text-anchor="end">chance 0.50</text><line x1="382.0" y1="32" x2="382.0" y2="186" stroke="#8c1d18" stroke-width="2"/><text x="386.0" y="14" font-size="11" fill="#8c1d18">bar 0.60</text><text x="8" y="62.0" font-size="12" fill="#11161a">Primary / year-over-year</text><line x1="219.4" y1="58.0" x2="304.9" y2="58.0" stroke="#11161a" stroke-width="2"/><line x1="219.4" y1="53.0" x2="219.4" y2="63.0" stroke="#11161a" stroke-width="2"/><line x1="304.9" y1="53.0" x2="304.9" y2="63.0" stroke="#11161a" stroke-width="2"/><path d="M 260.3 53.0 L 265.3 58.0 L 260.3 63.0 L 255.3 58.0 Z" fill="#8c1d18"/><text x="8" y="122.0" font-size="12" fill="#11161a">Secondary / 15-month trend</text><line x1="239.6" y1="118.0" x2="331.9" y2="118.0" stroke="#11161a" stroke-width="2"/><line x1="239.6" y1="113.0" x2="239.6" y2="123.0" stroke="#11161a" stroke-width="2"/><line x1="331.9" y1="113.0" x2="331.9" y2="123.0" stroke="#11161a" stroke-width="2"/><path d="M 284.4 113.0 L 289.4 118.0 L 284.4 123.0 L 279.4 118.0 Z" fill="#8c1d18"/><text x="8" y="182.0" font-size="12" fill="#11161a">Reference / raw level</text><line x1="176.7" y1="178.0" x2="259.1" y2="178.0" stroke="#11161a" stroke-width="2"/><line x1="176.7" y1="173.0" x2="176.7" y2="183.0" stroke="#11161a" stroke-width="2"/><line x1="259.1" y1="173.0" x2="259.1" y2="183.0" stroke="#11161a" stroke-width="2"/><path d="M 215.7 173.0 L 220.7 178.0 L 215.7 183.0 L 210.7 178.0 Z" fill="#8c1d18"/><text x="150" y="240" font-size="11" fill="#4a545c">Area under the curve: no ranking at the chance line, clears the bar only to the right of the red line</text></svg>
+<figcaption>
+  <strong>The two tests, and the reference.</strong>
+  <span class="what">Shows: every interval lies entirely below the chance line and below the
+  bar of 0.60, and the second test's interval reaches above chance only by a
+  fraction of a point. Does not show: an effect size of zero, or that the imagery carries no
+  signal &mdash; with 66 positive corridors the intervals are wide and
+  observational.</span>
+</figcaption>
+<details><summary>The same numbers as a table</summary>
+<div class="tblwrap" tabindex="0" role="region" aria-label="Table, scrollable sideways on narrow screens"><table><caption>Area under the curve, matched sample, with intervals</caption><thead><tr><th scope="col">Instrument</th><th scope="col">AUC</th><th scope="col">Interval</th><th scope="col">Analysed</th><th scope="col">Labelled</th><th scope="col">Unlabelled</th><th scope="col">Permutation p</th></tr></thead><tbody><tr><td>Primary / year-over-year</td><td>0.3901</td><td>0.3196 to 0.4671</td><td>644</td><td>66</td><td>578</td><td>0.00</td></tr><tr><td>Secondary / 15-month trend</td><td>0.4318</td><td>0.3544 to 0.5137</td><td>644</td><td>66</td><td>578</td><td>0.08</td></tr><tr><td>Reference / raw level</td><td>0.3133</td><td>0.2461 to 0.3881</td><td>644</td><td>66</td><td>578</td><td>0.00</td></tr></tbody></table></div>
+</details>
+</figure>
+
+<figure>
+<svg viewBox="0 0 440 150" role="img" aria-labelledby="c4t c4d" class="chart"><title id="c4t">Where the variance sits</title><desc id="c4d">Single stacked bar: corridor 81.2 per cent, month 5.9 per cent, residual 12.8 per cent.</desc><defs><pattern id="pat-corr" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#0e4d36"/></pattern><pattern id="pat-month" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#6b4700"/><line x1="0" y1="0" x2="0" y2="6" stroke="#ffffff" stroke-width="2"/></pattern><pattern id="pat-resid" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="6" height="6" fill="#e3e8ea"/><circle cx="3" cy="3" r="1" fill="#4a545c"/></pattern></defs><text x="40" y="22" font-size="12" fill="#4a545c">Share of the raw variance, additive corridor plus month</text><rect x="40.0" y="42" width="317.0" height="48" fill="url(#pat-corr)" stroke="#ffffff" stroke-width="1"/><text x="198.5" y="71.0" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">81.2%</text><rect x="357.0" y="42" width="23.0" height="48" fill="url(#pat-month)" stroke="#ffffff" stroke-width="1"/><line x1="368.5" y1="38" x2="368.5" y2="42" stroke="#4a545c"/><text x="368.5" y="34" font-size="12" fill="#11161a" text-anchor="middle">5.9%</text><rect x="380.0" y="42" width="50.0" height="48" fill="url(#pat-resid)" stroke="#ffffff" stroke-width="1"/><text x="405.0" y="71.0" font-size="13" font-weight="bold" fill="#11161a" text-anchor="middle">12.8%</text><text x="40" y="112" font-size="12" fill="#11161a">Corridor 81.2% | Month 5.9% | Residual 12.8%</text><text x="40" y="142" font-size="11" fill="#4a545c">Month entered first, then corridor; 183 corridor-months missing.</text></svg>
+<figcaption>
+  <strong>Where the variation sits.</strong>
+  <span class="what">Shows: with month entered first and corridor second, 5.9 per
+  cent of the raw variance is between months, 81.2 per cent between corridors,
+  leaving 12.8 per cent as interaction and noise &mdash; the only part a change
+  measure could use. The split is order-dependent: entering corridor first gives
+  82.1 per cent corridor and 5.1 per cent month, which is
+  why the order is stated rather than implied. Does not show: that the residual is condition;
+  land cover, weather and registration differences all sit in it.</span>
+</figcaption>
+<details><summary>The same numbers as a table</summary>
+<div class="tblwrap" tabindex="0" role="region" aria-label="Table, scrollable sideways on narrow screens"><table><caption>Variance decomposition of the raw contrast, sequential month then corridor</caption><thead><tr><th scope="col">Component</th><th scope="col">Share of total</th></tr></thead><tbody><tr><td>Month, entered first</td><td>5.9%</td></tr><tr><td>Corridor, entered second</td><td>81.2%</td></tr><tr><td>Residual</td><td>12.8%</td></tr><tr><td>Corridor first instead</td><td>82.1%</td></tr><tr><td>Month second instead</td><td>5.1%</td></tr><tr><td>Corridor-months used</td><td>18,517</td></tr></tbody></table></div>
+</details>
+</figure>
+
+<h2>How the measurement was made</h2>
+<p>For each corridor and each month, the mean normalised difference vegetation index of a
+band along the carriageway is subtracted from the mean of the verge beside it, at
+10&nbsp;metre resolution, from Sentinel-2 via the DE Africa platform. One value per corridor
+per month, 18,700 corridor-months over
+22 months, with 183 corridor-months
+missing and left missing.</p>
+<p>The primary instrument asks whether the contrast falls faster on corridors with a
+procurement record than on comparable corridors without one. Corridors are matched exactly
+on road class and on length band within class; the comparison is the probability that a
+labelled corridor ranks as more degraded than an unlabelled one, with a bootstrap interval
+and a permutation null.</p>
+
+<div class="nonclaims">
+<p><strong>Three things this does not claim.</strong></p>
+<ol>
+  <li><strong>Movement, not condition.</strong> The score has no level. A corridor that was
+  always bad and a corridor that never changed can produce the same value, so nothing here
+  ranks current condition.</li>
+  <li><strong>Reanalysis, not gauges.</strong> The rainfall used for the weather covariate
+  is a gridded reanalysis product, not a rain gauge, and it is used as context rather than
+  as a measured cause.</li>
+  <li><strong>Observational, not causal.</strong> 66 labelled
+  corridors is a small, non-random, spending-driven sample. A procurement record is evidence
+  that money was allocated, never that a road failed.</li>
+</ol>
+</div>
+
+<h2>What was checked</h2>
+<ul>
+  <li><strong>Completeness.</strong> Imagery: 22 of
+  22 months present, 0 missing,
+  69,212 rows, 850 corridors,
+  0 duplicate keys. Weather: 18,700 rows,
+  0 missing, 0 nulls.</li>
+  <li><strong>Duplicate keys.</strong> The merge is keyed on corridor, tile and month; the
+  count above is asserted at zero rather than assumed.</li>
+  <li><strong>The degeneracy gate.</strong> Before any test, each instrument is checked for
+  having enough distinct values and no modal value holding more than a fifth of the sample.
+  All three passed: Primary 850 distinct values on the modal share of
+  0.1%, Secondary 850 distinct, Reference
+  850 distinct.</li>
+  <li><strong>The coverage failure mode.</strong> A score that was really a proxy for
+  coverage produced a correlation of -0.0123 and an AUC of
+  0.5089 when coverage itself was used as the score, so the reported
+  instruments are not reading data availability.</li>
+  <li><strong>The bar.</strong> The decision rule was written down before the test ran:
+  point estimate at or above 0.60 and lower bound above 0.50. It was
+  not met, and it was not lowered afterwards.</li>
+</ul>
+
+<h2>Where the numbers come from</h2>
+<p>Every figure on this page is emitted by the script that built it, and every one is
+re-checked on each build against the file it came from. The page is regenerated offline; a
+number typed by hand would fail the build.</p>
+<p><a href="https://github.com/batestguy/roadsense-nigeria">Code, data manifests and the findings register on
+GitHub</a> &mdash; the repository holds the pipeline that produced these files, not the
+published dataset itself.</p>
+
+<footer>
+<p>Built by <code>scripts/build_report.py</code> from the files below. No network, no
+external fonts, no scripts. Input digests, first sixteen characters of SHA-256:</p>
+<div class="tblwrap" tabindex="0" role="region" aria-label="Table, scrollable sideways on narrow screens"><table><caption>Files this page was generated from</caption><thead><tr><th scope="col">File</th><th scope="col">Digest</th></tr></thead><tbody><tr><td>condition.parquet</td><td>ba49bc9b423da584</td></tr><tr><td>validation_v2.json</td><td>b0f696721cfe95ae</td></tr><tr><td>validation_v2_matched.csv</td><td>83e3bc32fe1f564f</td></tr><tr><td>imagery_r10.manifest.json</td><td>80355d3562f66d46</td></tr><tr><td>weather_daily_manifest.json</td><td>f46ad1c1ec73df67</td></tr></tbody></table></div>
+<p>Weather licence: CC BY 4.0, non-commercial use only (Open-Meteo free tier, ERA5/ERA5-Land reanalysis). Weather access date:
+2026-11-09.</p>
+</footer>
+</main>
+</body>
+</html>
