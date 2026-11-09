@@ -48,6 +48,8 @@ publish = [
 dev = [
     "pytest>=8",
     "ruff>=0.5",
+    # needed by the validation script, so its guard tests run in CI rather than skipping
+    "scipy>=1.11",
 ]
 
 [tool.setuptools.packages.find]
