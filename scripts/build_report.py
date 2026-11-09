@@ -86,7 +86,92 @@ DOCUMENTED: list[tuple[str, str, float, float, str]] = [
     # is which. Comparing it to this table's 38.3% would be comparing two different quantities.
 ]
 
+# --- the photographs --------------------------------------------------------------------
+# Author, licence and caption in one place: the credits block and the figure captions are
+# rendered from this list, and ``build_facts`` checks each file's real pixel size against the
+# numbers below, so an image that is resized on disk cannot silently arrive at the wrong
+# aspect ratio in the layout. Nothing here is edited on the page.
+LICENCE_URL = "https://creativecommons.org/licenses/by-sa/4.0"
+LICENCE_NAME = "CC BY-SA 4.0"
+
+PHOTOS: list[dict[str, Any]] = [
+    {
+        "file": "img/bad-road-lagos.jpg",
+        "width": 1000,
+        "height": 562,
+        "alt": "A cracked, waterlogged street in Lagos: a bus and several vans nose through "
+        "standing water while people walk along the edge of the flood.",
+        "caption": "A flooded, rutted road in Lagos, 2020: buses and vans picking their way "
+        "through, pedestrians on foot.",
+        "author": "Tunde Olowookere",
+    },
+    {
+        "file": "img/expressway.jpg",
+        "width": 1000,
+        "height": 750,
+        "alt": "An empty multi-lane dual carriageway with fresh surfacing, painted markings, "
+        "street lights and a grass verge, under a wide sky.",
+        "caption": "The same country: a dual carriageway outside Abuja, empty, lit and drained.",
+        "author": "Taini Ozeto",
+    },
+    {
+        "file": "img/construction-lagos.jpg",
+        "width": 1000,
+        "height": 666,
+        "alt": "Workers in high-visibility vests laying a new concrete slab by hand beside a "
+        "narrow residential street, with buildings and a parked car behind.",
+        "caption": "Concrete being laid in Bogije, Lagos: what the money buys when it arrives.",
+        "author": "Ayodele Adeniji",
+    },
+    {
+        "file": "img/akara-road.jpg",
+        "width": 1000,
+        "height": 652,
+        "alt": "An unpaved earth road running through a busy market street: shop fronts and "
+        "umbrellas on both sides, a lorry ahead, people walking across the surface.",
+        "caption": "An earth road through a market in Akara: no surface, no drainage, and a "
+        "town's traffic on it.",
+        "author": "Okechukwu Iroegbu",
+    },
+]
+
 NUM = re.compile(r"(?<![\w.,])\d+(?:,\d{3})*(?:\.\d+)?(?![\w,])")
+
+
+# --- figures from outside this project ---------------------------------------------------
+# Two constants quoted from one World Bank document. They are registered here, with their
+# source, for the same reason the computed facts are: ``audit_visible_numbers`` lets a number
+# onto the page only if some fact accounts for it, so an outside number needs an entry that
+# names where it came from. Both are quoted as the document states them. The 40 per cent
+# figure is a 2017 reading and the page says so; neither is presented as a current measurement.
+WORLD_BANK_DOC = {
+    "title": "World Bank, Nigeria Project Information Document, P180640",
+    "url": (
+        "https://documents1.worldbank.org/curated/en/099101624122030301/pdf/"
+        "P180640153b37e0118f6619610a8cd46c2.pdf"
+    ),
+    "accessed": "2026-11-09",
+}
+
+EXTERNAL: dict[str, dict[str, Any]] = {
+    "paved_share": {
+        "value": 30,
+        "statement": "of Nigeria's road network is paved, per cent",
+        "source": WORLD_BANK_DOC["title"],
+        "url": WORLD_BANK_DOC["url"],
+        "accessed": WORLD_BANK_DOC["accessed"],
+        "as_of": "",
+    },
+    "poor_condition": {
+        "value": 40,
+        "statement": "of federal roads were in poor condition, per cent",
+        "source": WORLD_BANK_DOC["title"] + ", its footnote citing the Systematic Country Diagnostic (2020)",
+        "footnote": "footnote 5",
+        "url": WORLD_BANK_DOC["url"],
+        "accessed": WORLD_BANK_DOC["accessed"],
+        "as_of": "2017",
+    },
+}
 
 
 # --- helpers ----------------------------------------------------------------------------
@@ -96,6 +181,34 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def jpeg_size(path: Path) -> tuple[int, int]:
+    """Pixel width and height from a JPEG's frame header, with no imaging library."""
+    data = path.read_bytes()
+    if data[:2] != b"\xff\xd8":
+        raise SystemExit(f"{path.name}: not a JPEG")
+    i = 2
+    while i < len(data) - 1:
+        if data[i] != 0xFF:
+            i += 1
+            continue
+        j = i + 1
+        while j < len(data) and data[j] == 0xFF:
+            j += 1
+        if j >= len(data) - 1:
+            break
+        marker = data[j]
+        if marker == 0x01 or 0xD0 <= marker <= 0xD9:
+            i = j + 1
+            continue
+        length = int.from_bytes(data[j + 1 : j + 3], "big")
+        if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+            height = int.from_bytes(data[j + 4 : j + 6], "big")
+            width = int.from_bytes(data[j + 6 : j + 8], "big")
+            return width, height
+        i = j + 1 + length
+    raise SystemExit(f"{path.name}: no frame header found")
 
 
 def esc(value: Any) -> str:
@@ -328,6 +441,29 @@ def build_facts() -> tuple[dict[str, Any], list[str], list[str]]:
     # GeoJSON. Nothing about a corridor's colour is decided in the renderer.
     layer = map_layer()
 
+    # The photographs. The declared size is checked against the file, so the width and height
+    # attributes in the page cannot disagree with the image the browser loads.
+    photos: list[dict[str, Any]] = []
+    for photo in PHOTOS:
+        path = OUT_DIR / photo["file"]
+        if not path.exists():
+            raise SystemExit(f"photo missing: {path.relative_to(ROOT)}")
+        got = jpeg_size(path)
+        declared = (int(photo["width"]), int(photo["height"]))
+        if got != declared:
+            raise SystemExit(
+                f"photo {photo['file']} is {got[0]}x{got[1]}, the page declares "
+                f"{declared[0]}x{declared[1]}"
+            )
+        photos.append(
+            {
+                **photo,
+                "credit": f"Photo: {photo['author']}, {LICENCE_NAME}",
+                "licence_url": LICENCE_URL,
+                "bytes": path.stat().st_size,
+            }
+        )
+
     # Provenance and the "what was checked" list.
     imagery_rows = int(imagery["rows"])
     weather_rows = int(weather["coverage"]["rows_present"])
@@ -421,6 +557,8 @@ def build_facts() -> tuple[dict[str, Any], list[str], list[str]]:
             "missing_cells": fint(corridor_months - int(len(usable))),
         },
         "map": layer["facts"],
+        "photos": photos,
+        "external": EXTERNAL,
         "checks": {
             "imagery_rows": fint(imagery_rows),
             "imagery_months": len(imagery["months_covered"]),
@@ -763,14 +901,19 @@ MAP_W, MAP_H, MAP_PAD = 640, 540, 8
 # vertices rather than shape: the network is not visibly distorted at any width.
 MAP_TOL = 1.0
 
-# Diverging ramp, warm for falling and cool for rising, with lightness rising away from zero so
-# the scale survives greyscale printing as well as the legend labels that carry the meaning.
+# Diverging pair anchored on grey, in two hues that carry no good-or-bad reading. An earlier
+# palette used green for a rising contrast, which read as "better"; a rising contrast is not
+# better — it means the verge is getting greener relative to the road, which can be scrub
+# closing in. Violet (falling) and blue (rising) are both cool, both darken with distance from
+# zero, and neither is the colour of a healthy road. The grey centre band still reads
+# "steady". Legend labels and counts are unchanged; lightness still rises away from zero, so
+# the scale survives greyscale printing as well as the labels that carry the meaning.
 BAND_COLOURS: dict[str, str] = {
-    "fall_hard": "#7d1d10",
-    "fall_mild": "#bf6f57",
+    "fall_hard": "#3d2a52",
+    "fall_mild": "#6b4f94",
     "steady": "#a7b1b7",
-    "rise_mild": "#4f8f83",
-    "rise_hard": "#0b4f45",
+    "rise_mild": "#38648c",
+    "rise_hard": "#1b3f5c",
 }
 NO_VALUE_COLOUR = "#cfd6da"
 BAND_ORDER = ["fall_hard", "fall_mild", "steady", "rise_mild", "rise_hard", "no_value"]
@@ -837,9 +980,11 @@ def map_layer() -> dict[str, Any]:
     lons: list[float] = []
     lats: list[float] = []
     source_vertices = 0
+    total_km = 0.0
     for feature in features:
         props = feature["properties"]
         cid = str(props["corridor_id"])
+        total_km += float(props.get("length_km") or 0.0)
         geometry = feature["geometry"]
         gtype = str(geometry["type"])
         raw = geometry["coordinates"]
@@ -956,6 +1101,7 @@ def map_layer() -> dict[str, Any]:
     facts: dict[str, Any] = {
         "n_corridors": len(paths),
         "n_corridors_label": fint(len(paths)),
+        "total_km": fint(round(total_km)),
         "n_coloured": fint(sum(counts[k] for k in BAND_COLOURS)),
         "n_no_value": fint(counts["no_value"]),
         "n_partial": fint(sum(1 for p in paths if p[2])),
@@ -1065,6 +1211,12 @@ CSS = """
 body { margin:0; background:#ffffff; color:#11161a;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height:1.55; font-size:1rem; }
+/* A faint tarred road behind the page. Kept at 5.5% so the paper stays the surface the text
+   sits on: at that weight the darkest pixel in the photograph composites to about #f1f1f1, and
+   the body text still measures above 16:1 against it. Decorative, so it carries no meaning and
+   is hidden from assistive technology by being a CSS background, not an image element. */
+body::before { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+  background:url("img/watermark-road.jpg") center top / cover no-repeat; opacity:.055; }
 .skip { position:absolute; left:-999px; top:0; background:#ffffff; color:#11161a;
   padding:.6rem 1rem; z-index:10; }
 .skip:focus { left:.5rem; top:.5rem; outline:3px solid #0e4d36; }
@@ -1091,6 +1243,15 @@ figure svg.chart { width:100%; height:auto; display:block; background:#ffffff;
   border:1px solid #c4ccd2; }
 figcaption { margin-top:.55rem; font-size:.92rem; color:#1d242a; }
 figcaption .what { display:block; color:#4a545c; }
+.photostrip { display:grid; grid-template-columns:1fr 1fr; gap:.9rem 1rem;
+  margin:1.3rem 0 1.6rem; align-items:start; }
+.photostrip figure { margin:0; }
+.photostrip figure.photo img { aspect-ratio:3 / 2; object-fit:cover; }
+figure.photo img { width:100%; height:auto; display:block; border:1px solid #c4ccd2; }
+figure.photo figcaption { font-size:.85rem; }
+.credit { display:block; color:#4a545c; font-size:.78rem; margin-top:.2rem; }
+.credits { list-style:none; margin:.5rem 0 0; padding:0; font-size:.88rem; }
+.credits li { margin:0 0 .35rem; max-width:none; }
 .tblwrap { overflow-x:auto; margin-top:.7rem; }
 .tblwrap:focus-visible { outline:3px solid #8c1d18; outline-offset:2px; }
 table { border-collapse:collapse; font-size:.88rem; min-width:26rem; width:100%; }
@@ -1123,6 +1284,8 @@ footer code { font-size:.8rem; word-break:break-all; }
   .finding .score { font-size:2.1rem; }
   .finding dl { grid-template-columns:1fr; }
   .finding dd { margin-bottom:.5rem; }
+  .photostrip { grid-template-columns:1fr; }
+  .photostrip figure.photo img { aspect-ratio:3 / 2; }
 }
 """
 
@@ -1139,6 +1302,23 @@ def table(title: str, head: list[str], rows: list[list[str]]) -> str:
     )
 
 
+def photo_figure(p: dict[str, Any]) -> str:
+    """One photograph: the file, the alt text, the declared size, and the required credit.
+
+    The caption and the credit are two separate elements so the credit is small type under the
+    caption, and the licence is the thing the link points at.
+    """
+    return (
+        '<figure class="photo">\n'
+        f'<img src="{esc(p["file"])}" alt="{esc(p["alt"])}" width="{p["width"]}" '
+        f'height="{p["height"]}" loading="lazy" decoding="async">\n'
+        f"<figcaption>{esc(p['caption'])}"
+        f'<span class="credit">Photo: {esc(p["author"])}, '
+        f'<a href="{LICENCE_URL}">{esc(LICENCE_NAME)}</a></span>'
+        "</figcaption>\n</figure>"
+    )
+
+
 def render(f: dict[str, Any]) -> str:
     h1 = f["headline"]
     seasonal = f["seasonal"]
@@ -1147,6 +1327,9 @@ def render(f: dict[str, Any]) -> str:
     tests = f["tests"]
     var = f["variance"]
     checks = f["checks"]
+    photos = f["photos"]
+    ext = f["external"]
+    photos = PHOTOS
 
     month_rows = [
         [m, f4(v)] for m, v in zip(seasonal["months"], seasonal["values"], strict=True)
@@ -1172,6 +1355,33 @@ def render(f: dict[str, Any]) -> str:
     digest_rows = [
         [name, digest] for name, digest in f["meta"]["digests"].items()
     ]
+    measure_rows = [
+        [
+            "Imagery months present",
+            f"{checks['imagery_months']} of {fint(seasonal['n_months'])}, "
+            f"{checks['imagery_missing_months']} missing",
+        ],
+        [
+            "Imagery rows, corridors, duplicate keys",
+            f"{checks['imagery_rows']}, {fint(h1['n_corridors'])}, {checks['duplicate_keys']}",
+        ],
+        [
+            "Weather rows, missing, nulls",
+            f"{checks['weather_rows']}, {checks['weather_missing']}, {checks['weather_nulls']}",
+        ],
+        [
+            "Score varies, all three instruments",
+            f"{deg_rows[0][1]} distinct values each, {deg_rows[0][2]} on the modal value",
+        ],
+        [
+            "Score is not a proxy for coverage",
+            f"correlation {tests['rows'][0]['cov_rho']}, AUC {tests['rows'][0]['cov_auc']}",
+        ],
+        [
+            "Decision rule, written before the test",
+            f"{tests['bar']} point estimate, lower bound above {tests['chance']}",
+        ],
+    ]
 
     # Figure 5 — the map. The layer is cached by ``map_layer``, so this is the same projection
     # and the same band assignment that went into ``facts``; the renderer only places it.
@@ -1194,6 +1404,42 @@ def render(f: dict[str, Any]) -> str:
     body = f"""
 <p class="eyebrow">RoadSense Nigeria &middot; measured <time>{esc(checks["imagery_generated"])}</time></p>
 <h1>The road condition signal does not clear its own bar</h1>
+
+<div class="photostrip">
+{photo_figure(photos[0])}
+{photo_figure(photos[1])}
+</div>
+
+<p>The World Bank puts the paved share of Nigeria's road network at {ext["paved_share"]["value"]}
+per cent. Above are the two ends of that range: a Lagos street where buses and vans pick their
+way through standing water, and a dual carriageway outside Abuja, empty, lit and drained.</p>
+
+<p>A photograph shows which of the two a road is on the day it was taken. It does not show which
+way the road is heading. The flooded street may flood every rainy season and be no worse than
+ten years ago; the carriageway may be losing its verge now.</p>
+
+<p>In {ext["poor_condition"]["as_of"]} the World Bank put
+{ext["poor_condition"]["value"]} per cent of federal roads in poor condition. That is one year's
+reading, not a trend. This page measures movement instead, over {fint(h1["n_corridors"])}
+federal corridors and {mapf["total_km"]}&nbsp;km of them: not which roads look bad today, but
+which are getting worse.</p>
+
+<h2>What the record says</h2>
+
+{photo_figure(photos[2])}
+
+<p>Nigeria's procurement record is the only national paper trail of road spending. It names a
+road, a state, a kind of work, an amount and a date: money allocated.</p>
+
+<p>It does not say whether the road got better. A contract records a promise, and a
+commissioning ceremony is a photograph of a promise, nothing more. The money may have reached
+the road, part of it, or none of it.</p>
+
+<p>The record shows where money moved; satellite imagery shows what the ground did. The test
+below asks whether the second predicts the first.</p>
+
+<h2>The result</h2>
+
 <p class="lede">One page on what this project measured across {fint(h1["n_corridors"])}
 federal road corridors, why the measurement failed its pre-specified test, and what it
 still supports.</p>
@@ -1214,14 +1460,14 @@ still supports.</p>
 corridors the wrong way round, so it cannot be used to allocate maintenance, and this page
 exists to say so before anything else on it.</p>
 
-<h2>What the five figures show</h2>
+<h2>The five figures</h2>
 
 <figure>
 <h3>The map: movement, not condition</h3>
 <p class="mapnote">Across {mapf["n_corridors_label"]} corridors over
 {mapf["months_in_window"]} months, {mapf["n_fall"]} fell, {mapf["n_rise"]} rose and
-{mapf["n_steady"]} stayed within {mapf["inner"]} of zero either way. The spread is set by the data:
-the outer band starts at {mapf["outer"]}, the ninetieth percentile of absolute movement.</p>
+{mapf["n_steady"]} stayed within {mapf["inner"]} of zero either way. The outer band starts at
+{mapf["outer"]}, the ninetieth percentile of absolute movement.</p>
 {svg_map(layer)}
 <ul class="legend">{"".join(legend_items)}</ul>
 <figcaption>
@@ -1238,8 +1484,8 @@ the outer band starts at {mapf["outer"]}, the ninetieth percentile of absolute m
   than given a colour; {mapf["n_partial"]} rest on fewer than {mapf["months_in_window"]} monthly
   values and carry a dotted outline. {mapf["cells_missing_window"]} corridor-months inside the
   window carry no value and are left out, not interpolated ({mapf["cells_missing_panel"]} across
-  the whole panel). Does not show: current condition, or that a dark red corridor is in worse
-  shape today than a dark green one &mdash; only that its contrast moved further in one direction
+  the whole panel). Does not show: current condition, or that a dark violet corridor is in worse
+  shape today than a dark blue one &mdash; only that its contrast moved further in one direction
   over the period.</span>
 </figcaption>
 <details><summary>The same numbers as a table</summary>
@@ -1335,63 +1581,62 @@ histogram drawn with {degenerate["n_bins"]} equal bins between {degenerate["x_mi
 </figure>
 
 <h2>How the measurement was made</h2>
-<p>For each corridor and each month, the mean normalised difference vegetation index of a
-band along the carriageway is subtracted from the mean of the verge beside it, at
-{panel["resolution_m"]}&nbsp;metre resolution, from Sentinel-2 via the DE Africa platform. One value per corridor
-per month, {panel["corridor_months"]} corridor-months over
-{fint(seasonal["n_months"])} months, with {panel["missing_cells"]} corridor-months
-missing and left missing.</p>
-<p>The primary instrument asks whether the contrast falls faster on corridors with a
-procurement record than on comparable corridors without one. Corridors are matched exactly
-on road class and on length band within class; the comparison is the probability that a
-labelled corridor ranks as more degraded than an unlabelled one, with a bootstrap interval
-and a permutation null.</p>
+
+<p>For each corridor and each month, the mean vegetation index of a band along the carriageway
+is subtracted from the mean of the verge beside it, at {panel["resolution_m"]}&nbsp;metre
+resolution, from Sentinel-2 via the DE Africa platform. That gives one value per corridor per
+month: {panel["corridor_months"]} corridor-months over {fint(seasonal["n_months"])} months,
+with {panel["missing_cells"]} left blank rather than filled.</p>
+
+{table("What was checked before the test ran", ["Check", "Result"], measure_rows)}
+
+<p>The test asks whether the contrast falls faster on corridors with a procurement record than
+on comparable corridors without one. Corridors are matched exactly on road class and on length
+band within class; the statistic is the probability that a labelled corridor ranks as more
+degraded than an unlabelled one, with a bootstrap interval and a permutation null. The bar was
+written down before the test ran, and was not lowered after it failed.</p>
+
+<h2>What this does not claim</h2>
 
 <div class="nonclaims">
-<p><strong>Three things this does not claim.</strong></p>
+<p><strong>Four things this does not claim.</strong></p>
 <ol>
-  <li><strong>Movement, not condition.</strong> The score has no level. A corridor that was
-  always bad and a corridor that never changed can produce the same value, so nothing here
-  ranks current condition.</li>
-  <li><strong>Reanalysis, not gauges.</strong> The rainfall used for the weather covariate
-  is a gridded reanalysis product, not a rain gauge, and it is used as context rather than
-  as a measured cause.</li>
-  <li><strong>Observational, not causal.</strong> {fint(h1["n_labelled"])} labelled
-  corridors is a small, non-random, spending-driven sample. A procurement record is evidence
-  that money was allocated, never that a road failed.</li>
+  <li><strong>Movement, not condition.</strong> The score has no level: a corridor that was
+  always bad and one that never changed can produce the same value.</li>
+  <li><strong>Federal corridors only.</strong> The network is the named federal highways;
+  feeder roads, which carry much of the traffic, are not in it.</li>
+  <li><strong>Reanalysis, not gauges.</strong> The rainfall covariate is a gridded reanalysis
+  product, not a rain gauge, and it is context rather than a measured cause.</li>
+  <li><strong>Observational, not causal.</strong> {fint(h1["n_labelled"])} labelled corridors
+  is a small, non-random, spending-driven sample. A procurement record is evidence that money
+  was allocated, never that a road failed.</li>
 </ol>
 </div>
 
-<h2>What was checked</h2>
-<ul>
-  <li><strong>Completeness.</strong> Imagery: {checks["imagery_months"]} of
-  {seasonal["n_months"]} months present, {checks["imagery_missing_months"]} missing,
-  {checks["imagery_rows"]} rows, {fint(h1["n_corridors"])} corridors,
-  {checks["duplicate_keys"]} duplicate keys. Weather: {checks["weather_rows"]} rows,
-  {checks["weather_missing"]} missing, {checks["weather_nulls"]} nulls.</li>
-  <li><strong>Duplicate keys.</strong> The merge is keyed on corridor, tile and month; the
-  count above is asserted at zero rather than assumed.</li>
-  <li><strong>The degeneracy gate.</strong> Before any test, each instrument is checked for
-  having enough distinct values and no modal value holding more than a fifth of the sample.
-  All three passed: {deg_rows[0][0]} {deg_rows[0][1]} distinct values on the modal share of
-  {deg_rows[0][2]}, {deg_rows[1][0]} {deg_rows[1][1]} distinct, {deg_rows[2][0]}
-  {deg_rows[2][1]} distinct.</li>
-  <li><strong>The coverage failure mode.</strong> A score that was really a proxy for
-  coverage produced a correlation of {tests["rows"][0]["cov_rho"]} and an AUC of
-  {tests["rows"][0]["cov_auc"]} when coverage itself was used as the score, so the reported
-  instruments are not reading data availability.</li>
-  <li><strong>The bar.</strong> The decision rule was written down before the test ran:
-  point estimate at or above {tests["bar"]} and lower bound above {tests["chance"]}. It was
-  not met, and it was not lowered afterwards.</li>
-</ul>
+{photo_figure(photos[3])}
 
 <h2>Where the numbers come from</h2>
-<p>Every figure on this page is emitted by the script that built it, and every one is
-re-checked on each build against the file it came from. The page is regenerated offline; a
-number typed by hand would fail the build.</p>
-<p><a href="{esc(f["meta"]["repo_url"])}">Code, data manifests and the findings register on
-GitHub</a> &mdash; the repository holds the pipeline that produced these files, not the
-published dataset itself.</p>
+<p>Every figure on this page is emitted by the script that built it and re-checked on each
+build against the file it came from; a number typed by hand would fail the build. The
+<a href="{esc(f["meta"]["repo_url"])}">code, data manifests and findings register are on
+GitHub</a>.</p>
+
+<h2>Credits</h2>
+<ul class="credits">
+  <li><strong>Photographs.</strong> Tunde Olowookere (a Lagos road, 2020); Taini Ozeto (dual
+  carriageway outside Abuja); Ayodele Adeniji (concrete in Bogije, Lagos); Okechukwu Iroegbu (an
+  earth road through a market at Akara); Wikisoft bros (a tarred road, used as the faint page
+  watermark). All five images are <a href="{LICENCE_URL}">{LICENCE_NAME}</a>; each caption above
+  carries its own credit.</li>
+  <li><strong>Outside figures.</strong> {ext["paved_share"]["value"]} per cent of the road
+  network paved, and {ext["poor_condition"]["value"]} per cent of federal roads in poor
+  condition in {ext["poor_condition"]["as_of"]}: {esc(ext["paved_share"]["source"])},
+  {esc(ext["poor_condition"]["footnote"])} citing the Systematic Country Diagnostic (2020),
+  downloaded {esc(ext["paved_share"]["accessed"])}. <a href="{esc(ext["paved_share"]["url"])}">The
+  document</a>.</li>
+  <li><strong>Licensing.</strong> Photographs CC BY-SA 4.0; the page text and the code that
+  builds it MIT; the tables of derived numbers CC BY-SA 4.0.</li>
+</ul>
 
 <footer>
 <p>Built by <code>scripts/build_report.py</code> from the files below. No network, no
@@ -1477,6 +1722,21 @@ def main(argv: list[str] | None = None) -> int:
         if ratio < 4.5:
             failures.append(f"{name}: {ratio:.2f}:1")
         print(f"  {name:<34} {ratio:5.2f}:1  {verdict}")
+
+    # Map marks are non-text graphics: WCAG 2.2 asks for 3:1 against the page. The four coloured
+    # arms are checked and fail the build below 3:1. The grey "steady" band is deliberately
+    # light — it is the near-zero background class, and drawn at 3:1 it would dominate a map of
+    # 434 steady corridors — so its ratio is printed as measured rather than gated, and the
+    # class is named in the legend and in the table under the figure.
+    print("\nMap arms against the page (non-text graphics need 3:1):")
+    for key in ("fall_hard", "fall_mild", "rise_mild", "rise_hard"):
+        ratio = contrast_ratio(BAND_COLOURS[key], PAPER)
+        verdict = "pass" if ratio >= 3.0 else "FAIL"
+        if ratio < 3.0:
+            failures.append(f"map arm {key}: {ratio:.2f}:1")
+        print(f"  {key:<34} {ratio:5.2f}:1  {verdict}")
+    steady_ratio = contrast_ratio(BAND_COLOURS["steady"], PAPER)
+    print(f"  {'steady, near-zero background':<34} {steady_ratio:5.2f}:1  measured, not gated")
 
     unknown = audit_visible_numbers(page, facts)
     print(f"\nNumber audit: {len(NUM.findall(page))} tokens in source, "

@@ -168,6 +168,25 @@
     "x_min": "-0.0071",
     "zero": "0"
   },
+  "external": {
+    "paved_share": {
+      "accessed": "2026-11-09",
+      "as_of": "",
+      "source": "World Bank, Nigeria Project Information Document, P180640",
+      "statement": "of Nigeria's road network is paved, per cent",
+      "url": "https://documents1.worldbank.org/curated/en/099101624122030301/pdf/P180640153b37e0118f6619610a8cd46c2.pdf",
+      "value": 30
+    },
+    "poor_condition": {
+      "accessed": "2026-11-09",
+      "as_of": "2017",
+      "footnote": "footnote 5",
+      "source": "World Bank, Nigeria Project Information Document, P180640, its footnote citing the Systematic Country Diagnostic (2020)",
+      "statement": "of federal roads were in poor condition, per cent",
+      "url": "https://documents1.worldbank.org/curated/en/099101624122030301/pdf/P180640153b37e0118f6619610a8cd46c2.pdf",
+      "value": 40
+    }
+  },
   "headline": {
     "auc": "0.3901",
     "bar": "0.60",
@@ -182,14 +201,14 @@
   "map": {
     "bands": [
       {
-        "colour": "#7d1d10",
+        "colour": "#3d2a52",
         "count": 27,
         "count_label": "27",
         "key": "fall_hard",
         "label": "contrast falling by 0.02 or more"
       },
       {
-        "colour": "#bf6f57",
+        "colour": "#6b4f94",
         "count": 42,
         "count_label": "42",
         "key": "fall_mild",
@@ -203,14 +222,14 @@
         "label": "steady, within 0.01 either way"
       },
       {
-        "colour": "#4f8f83",
+        "colour": "#38648c",
         "count": 202,
         "count_label": "202",
         "key": "rise_mild",
         "label": "contrast rising by 0.01 to 0.02"
       },
       {
-        "colour": "#0b4f45",
+        "colour": "#1b3f5c",
         "count": 145,
         "count_label": "145",
         "key": "rise_hard",
@@ -248,6 +267,7 @@
     "rise_mild": "202",
     "source_vertices": "127,091",
     "steady": "434",
+    "total_km": "18,419",
     "width": 640,
     "window_label": "2025-09 to 2026-06"
   },
@@ -266,6 +286,52 @@
     "missing_cells": "183",
     "resolution_m": "10"
   },
+  "photos": [
+    {
+      "alt": "A cracked, waterlogged street in Lagos: a bus and several vans nose through standing water while people walk along the edge of the flood.",
+      "author": "Tunde Olowookere",
+      "bytes": 165992,
+      "caption": "A flooded, rutted road in Lagos, 2020: buses and vans picking their way through, pedestrians on foot.",
+      "credit": "Photo: Tunde Olowookere, CC BY-SA 4.0",
+      "file": "img/bad-road-lagos.jpg",
+      "height": 562,
+      "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+      "width": 1000
+    },
+    {
+      "alt": "An empty multi-lane dual carriageway with fresh surfacing, painted markings, street lights and a grass verge, under a wide sky.",
+      "author": "Taini Ozeto",
+      "bytes": 62118,
+      "caption": "The same country: a dual carriageway outside Abuja, empty, lit and drained.",
+      "credit": "Photo: Taini Ozeto, CC BY-SA 4.0",
+      "file": "img/expressway.jpg",
+      "height": 750,
+      "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+      "width": 1000
+    },
+    {
+      "alt": "Workers in high-visibility vests laying a new concrete slab by hand beside a narrow residential street, with buildings and a parked car behind.",
+      "author": "Ayodele Adeniji",
+      "bytes": 168121,
+      "caption": "Concrete being laid in Bogije, Lagos: what the money buys when it arrives.",
+      "credit": "Photo: Ayodele Adeniji, CC BY-SA 4.0",
+      "file": "img/construction-lagos.jpg",
+      "height": 666,
+      "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+      "width": 1000
+    },
+    {
+      "alt": "An unpaved earth road running through a busy market street: shop fronts and umbrellas on both sides, a lorry ahead, people walking across the surface.",
+      "author": "Okechukwu Iroegbu",
+      "bytes": 132639,
+      "caption": "An earth road through a market in Akara: no surface, no drainage, and a town's traffic on it.",
+      "credit": "Photo: Okechukwu Iroegbu, CC BY-SA 4.0",
+      "file": "img/akara-road.jpg",
+      "height": 652,
+      "licence_url": "https://creativecommons.org/licenses/by-sa/4.0",
+      "width": 1000
+    }
+  ],
   "seasonal": {
     "dec_label": "0.071",
     "dec_month": "2024-12",
