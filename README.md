@@ -14,6 +14,7 @@ opening photographs](docs/images/report-top.jpg)
   <a href="docs/article.md">Article</a> ·
   <a href="docs/findings.md">Findings register</a> ·
   <a href="https://github.com/batestguy/roadsense-nigeria/releases/download/demo-v1/roadsense-demo.mp4">Download the one-minute walkthrough</a>
+  (<a href="https://github.com/batestguy/roadsense-nigeria/releases/download/demo-v1/roadsense-demo-with-music.mp4">with music</a>)
 </p>
 
 ---
