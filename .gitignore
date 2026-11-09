@@ -28,3 +28,6 @@ mlflow.db
 .idea/
 .DS_Store
 Thumbs.db
+
+# Local browser screenshots from accessibility checks
+.playwright-mcp/
