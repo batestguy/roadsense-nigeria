@@ -12,7 +12,8 @@ opening photographs](docs/images/report-top.jpg)
   <a href="https://doi.org/10.5281/zenodo.24081356">Paper</a> ·
   <a href="https://huggingface.co/datasets/JBZABC/roadsense-nigeria">Dataset</a> ·
   <a href="docs/article.md">Article</a> ·
-  <a href="docs/findings.md">Findings register</a>
+  <a href="docs/findings.md">Findings register</a> ·
+  <a href="https://github.com/batestguy/roadsense-nigeria/releases/download/demo-v1/roadsense-demo.mp4">Download the one-minute walkthrough</a>
 </p>
 
 ---
