@@ -5,7 +5,7 @@ highway corridors — and the pre-registered test that failed when the measureme
 the open record of where maintenance money went.
 
 ![The report page: a tarred Nigerian dual carriageway behind the writing, with the result and the two
-opening photographs](docs/images/report-top.png)
+opening photographs](docs/images/report-top.jpg)
 
 <p align="center">
   <a href="https://batestguy.github.io/roadsense-nigeria/publish/">Report</a> ·
