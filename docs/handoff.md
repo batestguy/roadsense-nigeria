@@ -30,7 +30,8 @@ pipeline, and the negative result — not a model.
 | Public report page | ✅ live |
 | Dataset | ✅ published, anonymous download verified |
 | Corridor map | ✅ inside the report page |
-| Article | ✅ written; preprint not started |
+| Article | ✅ written and published in the repo |
+| Paper | ✅ published as a preprint, DOI 10.5281/zenodo.24081356 (CC BY 4.0); source in `docs/paper.md` |
 
 ### The three URLs
 
@@ -76,7 +77,7 @@ Do not present that 0.5735 as a result, and do not mention the post-hoc mirror o
 |---|---|
 | Any hazard model | The validation result. Do not build one on this measure. |
 | The reversed hypothesis | New data. Testing the mirror direction on the same numbers is not a test. |
-| A preprint | A literature review, and a decision that the article's framing survives contact with readers. |
+| A journal submission | The paper is now a Zenodo preprint (10.5281/zenodo.24081356, CC BY 4.0). A journal would still cost money: the only in-scope Nigerian Scopus title charges ₦80,000 and is currently closed to submissions. |
 | A commercial deployment | The weather reanalysis is **non-commercial only**. The code is MIT; derived tables are CC BY-SA. |
 
 Nothing else is blocked. No credentials are needed to read the data or run the page.
@@ -136,6 +137,7 @@ Each run streams its window and stores nothing. The windows' artifacts expire 90
 | `tests/` | 91 tests, including the guard tests that are proved to fail when the guard is removed |
 | `docs/publish/` | The generated report page and its `facts.json` — never hand-edited |
 | `docs/article.md` | The same argument for a reader who will not clone the repo |
+| `docs/paper.md` | The formal paper, published as a preprint: 10.5281/zenodo.24081356 |
 | `docs/handoff.md` | This page |
 
 Data does not live in git. `data/` is gitignored; the published copy is on Hugging Face.
@@ -150,7 +152,9 @@ The user is preparing a polish pass and will bring suggestions. The items alread
 2. **README length.** 115 lines; a third of it belongs in `docs/`.
 3. **The article's voice.** It is written in the assistant's register, not the owner's. This is the
    one that needs a human, and it matters most for the audience the page is for.
-4. **The preprint.** Not started, deliberately: it needs a literature review first.
+4. **The paper.** Published as a preprint: DOI 10.5281/zenodo.24081356, CC BY 4.0, nine pages, source
+   in `docs/paper.md`. The literature review behind it is in `.agent/T26-report.md` and the review in
+   `.agent/T27-review.md`.
 
 Before changing anything, run `python scripts/build_report.py` and confirm it reproduces the
 committed page byte-for-byte. If it does not, something has drifted and that matters more than polish.

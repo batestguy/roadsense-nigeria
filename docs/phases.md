@@ -1,7 +1,7 @@
 # Build phases
 
-Status as of 2026-10-28. Companion to `preflight-spec.md` (what we agreed) and `docs/findings.md`
-(what we verified).
+Status as of 2026-11-09, and this date is maintained: change it whenever a status below changes.
+Companion to `preflight-spec.md` (what we agreed) and `docs/findings.md` (what we verified).
 
 Rule: a phase is not done until its **exit criterion** is met and its outputs are committed. Phases may
 overlap only where stated. If a phase slips, cut scope from the end of the plan — never from the middle.
@@ -11,15 +11,15 @@ overlap only where stated. If a phase slips, cut scope from the end of the plan 
 | 0 | Preflight | ✅ complete | — |
 | 1 | Scaffold + Gate G0 | ✅ complete (gate failed, re-scoped) | Phase 0 |
 | 2 | Ingestion + corridors | ✅ complete | Phase 1 |
-| 3 | Imagery + weather | 🔄 pilot complete | Phase 2 |
-| 4 | Features, Feast, dbt | ⏳ | Phase 3 |
-| 5 | Modelling | ⏳ | Phase 4 |
-| 6 | Optimisation | ⏳ | Phase 5 |
-| 7 | Serving | ⏳ | Phase 6 |
-| 8 | Documentation + demo | ⏳ | Phase 7 |
+| 3 | Imagery + weather | ✅ complete — 22 months at 10 m, 69,212 readings, 850 corridors, weather for all 18,700 corridor-months | Phase 2 |
+| 4 | Features, Feast, dbt | 🔄 features built; Feast and dbt not proceeding | Phase 3 |
+| 5 | Modelling | ⛔ not proceeding — the pre-registered test failed (F23) | Phase 4 |
+| 6 | Optimisation | ⛔ not proceeding — depends on Phase 5 | Phase 5 |
+| 7 | Serving | ⛔ not proceeding as specified — the report page that shipped is Phase 9's | Phase 6 |
+| 8 | Documentation + demo | 🔄 partly done; remainder not proceeding | Phase 7 |
 | 9 | **Public audit** — report, dataset, tests | ✅ complete 2026-11-09 | 2, 3 |
 | 10 | **The map** — inside the report | ✅ complete 2026-11-09 | 9 |
-| 11 | **The write-up** — article, then preprint | 🔄 article in progress | 9 |
+| 11 | **The write-up** — article and paper | ✅ article written; paper published as a preprint, 10.5281/zenodo.24081356 | 9 |
 
 **Re-scoped 2026-11-09.** Phase 5 (modelling) cannot proceed on the evidence. Two pre-specified
 tests were run against the completed 22-month measurement; both failed, the second with the sign
@@ -87,7 +87,7 @@ workflow fails loudly rather than skipping silently if it is absent.
 
 ---
 
-## Phase 3 — Imagery + weather 🔄
+## Phase 3 — Imagery + weather ✅
 
 **Goal:** prove the sampler, then scale it.
 
@@ -107,21 +107,25 @@ workflow fails loudly rather than skipping silently if it is absent.
   with a duplicate check that fails the run if shards overlap. **Smoke-tested on a runner
   2026-10-29** (run 40820091470): all three jobs green, merged artifact read back and inspected.
   Default is 96 shards — 48 allows 4.2–8.4 h per job against a 6 h limit.
-- ⬜ Weather from Open-Meteo per 1° cell.
-- ⬜ The actual national run — it is manual, because it streams ~70 GB and takes hours.
+- ✅ Weather from Open-Meteo per 1° cell — monthly features for all 18,700 corridor-months
+  (`scripts/build_weather.py`) and daily rolling features (30-day, 7-day maximum, dry spells) for
+  the same set (`scripts/build_weather_daily.py`). No gaps.
+- ✅ The actual national run — eleven two-month windows, all at 10 m, ~70 GB streamed and nothing
+  stored, $0. Every month complete.
 - ✅ **Feature redesign from F17** — `rings()` samples an undilated centreline plus a 50–150 m
   verge band, and `contrast()` signs the difference. Verified: carriageway NDVI 0.03–0.12, verge
   greener on most corridors (findings F19).
 - ✅ **O3 ablation run.** 40 m preserves level (ρ=0.937) and change (ρ=0.917) but flips the
   contrast sign on 20.6% of corridor-months, so the condition signal must run at 10 m (F19).
   See `docs/resolution-ablation.md`.
-- ⬜ **Resolution consequence:** Phase 4's feature build is a ~70 GB / ~281 h job at 10 m, not the
-  31 GB / 144 h the 40 m run implied. The backfill must be sharded either way.
+- ✅ **Resolution consequence — landed.** The feature build the ablation implied ran at 10 m rather
+  than at the 40 m default, delivered as the eleven windows above; the 96-shard split was kept, as
+  planned.
 
 **Exit criterion:** pilot features for one state; measured bytes/requests recorded in
 `docs/findings.md` replacing the 6,000-tile estimate (closes O2). **Met**, and the backfill runner
-is built and smoke-tested on a runner. Remaining: weather ingest, and executing the national run
-itself.
+is built and smoke-tested on a runner. The weather ingest is complete and the national run has been
+executed.
 
 **Resolution decision — made, not deferred (F19):** run the condition signal at **10 m**. The
 ablation showed 40 m preserves levels (ρ=0.937) and change (ρ=0.917) but flips the sign of the
@@ -134,22 +138,33 @@ workstation pilot, which was latency-bound on nine overview requests per 8 km re
 
 ---
 
-## Phase 4 — Features, Feast, dbt ⏳
+## Phase 4 — Features, Feast, dbt — features built, remainder not proceeding
 
 **Goal:** turn observations into a versioned feature set with tests.
 
-- 24-month rolling NDVI/NDBI statistics, rainfall and soil-moisture features.
-- dbt models with tests and docs; Feast feature views over Parquet.
-- Data-quality checks emitted as metrics.
+- ✅ Condition for 18,700 corridor-months with corridor and month effects removed; monthly weather
+  for the same 18,700 corridor-months; daily rolling rainfall features for the same set. No gaps.
+- ⛔ 24-month rolling NDVI/NDBI statistics and soil-moisture features — not built.
+- ⛔ dbt models with tests and docs; Feast feature views over Parquet — never built.
+- ⛔ Data-quality checks emitted as metrics.
+
+**Why the remainder stops:** Feast and dbt are architecture for a model, and there is no model. The
+pre-registered test failed (`docs/handoff.md`, F23), so a feature store and a transformation layer
+would have nothing to serve.
 
 **Exit criterion:** `dbt build` green including tests; `feast apply` + historical retrieval returns
-the expected matrix for a sample of segments.
+the expected matrix for a sample of segments. **Not met, and withdrawn** with the parts of the phase
+that are not proceeding.
 
 ---
 
-## Phase 5 — Modelling ⏳
+## Phase 5 — Modelling ⛔ not proceeding
 
 **Goal:** a defensible hazard model and an honest secondary survival analysis.
+
+**Not proceeding.** The pre-registered test failed on the completed 22-month measurement — AUC
+0.3901 against a bar of 0.60, with the whole interval below 0.50 (F23). No hazard model is being
+built on this measure, so the bullets below are a record of what was intended, not a queue of work.
 
 - Discrete-time hazard, temporal split (train 2023–2024, test 2025).
 - Baselines: class-only, and a no-satellite feature set.
@@ -161,9 +176,13 @@ why the signal is weak. Model card written.
 
 ---
 
-## Phase 6 — Optimisation ⏳
+## Phase 6 — Optimisation ⛔ not proceeding
 
 **Goal:** turn risk into an allocatable plan.
+
+**Not proceeding.** It depends on Phase 5, and Phase 5 is not proceeding: allocation needs a risk
+estimate that ranks condition, and this project does not have one. The bullets below record the
+intended design only.
 
 - 0/1 knapsack (PuLP/CBC) over predicted risk × exposure, subject to budget.
 - Sensitivity across budget levels; improvement multiplier vs uniform allocation.
@@ -173,9 +192,14 @@ why the signal is weak. Model card written.
 
 ---
 
-## Phase 7 — Serving ⏳
+## Phase 7 — Serving ⛔ not proceeding as specified
 
 **Goal:** something a stranger can click and understand.
+
+**Not proceeding as specified.** The one part that shipped is the static report page, which is
+Phase 9's deliverable (`docs/publish/index.html`, live at the report URL). The risk tiles, the
+segment detail panel and the budget control are not coming: tiles and a budget control are the
+serving layer for a model and an allocation this project does not have.
 
 - Risk tiles for MapLibre, served static from GitHub Pages.
 - Segment detail panel, budget control by percentage of network.
@@ -185,20 +209,26 @@ why the signal is weak. Model card written.
 
 ---
 
-## Phase 8 — Documentation + demo ⏳
+## Phase 8 — Documentation + demo — partly done, remainder not proceeding
 
 **Goal:** the artefacts that make the work legible.
 
-- Quarto report, data dictionary, architecture diagram, cost analysis, demo video.
-- Dagster demo DAG.
-- OpenTofu managing GitHub repo settings.
+- ✅ `docs/findings.md` (every measured fact with its date), `docs/handoff.md`, the generated
+  dataset card, and the generated report page.
+- ⛔ Quarto report, architecture diagram, demo video — not coming.
+- ⛔ Dagster demo DAG — not coming.
+- ⛔ OpenTofu managing GitHub repo settings — not coming.
+
+**Why the remainder stops:** these were deliverables for a project heading towards a model and a
+demo. The work now stands on the report page, the published dataset and the article, and the
+exit criterion below is not met and not being pursued.
 
 **Exit criterion:** deliverables checklist in `preflight-spec.md` §9 fully present; cold clone runs
 end to end following the README alone.
 
 ---
 
-## Phase 9 — Public audit (Route A) ▶
+## Phase 9 — Public audit (Route A) ✅
 
 **Goal:** one URL a stranger can open and, in sixty seconds, understand what was asked, what was
 measured, what was found, and that they can re-run it. The deliverable is not a claim of success; it
@@ -231,7 +261,7 @@ token disabled), 91 tests passing in CI on Python 3.12 and 3.13. Two defects wer
 the page rather than reading the code: wide tables that could not be reached by keyboard, and an axis
 note clipped at phone width. Both fixed and re-measured.
 
-## Phase 10 — The map (Route B) ⏳
+## Phase 10 — The map (Route B) ✅
 
 **Goal:** corridors coloured by measured change, inside the report — not a separate toy.
 
@@ -245,13 +275,16 @@ note clipped at phone width. Both fixed and re-measured.
 **Met 2026-11-09.** Measured at both widths: no horizontal overflow, no clipped text, no console
 errors. The movement-not-condition sentence is inside the figure's own caption.
 
-## Phase 11 — The write-up (Route C) ⏳
+## Phase 11 — The write-up (Route C) ✅ article written; paper published as a preprint
 
 **Goal:** the argument, in prose, for someone who will never clone the repo.
 
-- 1,200-word article: what was asked, what was measured, the two instruments and why both failed,
-  what survives.
-- Then, if the reception warrants it, a preprint or workshop submission with a proper literature
-  review — not before, because a preprint without a review is a blog post with a citation format.
+- ✅ 1,200-word article, in the repo at `docs/article.md`: what was asked, what was measured, the
+  two instruments and why both failed, what survives.
+- ✅ A formal paper: `docs/paper.md`, published as a Zenodo preprint, DOI
+  **10.5281/zenodo.24081356**, CC BY 4.0, nine pages. The literature review behind it is in
+  `.agent/T26-report.md`, and an independent review checked its citations and its framing. It has not
+  been submitted to a journal: no free Scopus-indexed Nigerian venue exists, and the one in-scope title
+  charges ₦80,000 and is currently closed to submissions.
 
 **Exit criterion:** the article's every number traces to a figure on the report page.

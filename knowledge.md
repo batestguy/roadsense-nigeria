@@ -17,9 +17,13 @@ There is no model, no degradation index and no allocation tool. Do not assume on
 - Measured: 69,212 readings, 850 corridors, 22 months, every month complete.
 - Weather: monthly and daily features, 18,700 corridor-months, no gaps.
 - Condition measure: 18,700 corridor-months, corridor and month effects removed.
-- Validation: run twice, pre-specified, both failed. See `docs/findings.md` F23.
+- Validation: the pre-registered test failed, and the history matters. The first attempt was
+  invalid, not unlucky: its score was identically zero by construction, so it could not detect
+  anything and was discarded. The primary instrument then returned AUC 0.3901 against a bar of
+  0.60, and the secondary 0.4318 — both below the bar. See `docs/findings.md` F23.
 - Published: report page on GitHub Pages; dataset on Hugging Face, anonymous download verified.
-- Written: article in `docs/article.md`. Preprint not started.
+- Written: the article is in `docs/article.md`; the paper is published as a preprint,
+  DOI 10.5281/zenodo.24081356, with its source at `docs/paper.md`.
 
 ## The three URLs
 
@@ -35,6 +39,7 @@ There is no model, no degradation index and no allocation tool. Do not assume on
 | `docs/findings.md` | Every measured fact with its date; the source of truth |
 | `docs/phases.md` | What is built, what failed, what follows |
 | `docs/article.md` | The argument, in prose, for a reader who will not clone the repo |
+| `docs/paper.md` | The formal manuscript, published as a preprint (10.5281/zenodo.24081356) |
 | `preflight-spec.md` | Agreed scope and thresholds, committed before the tests ran |
 
 ## Two warnings for anyone continuing this work

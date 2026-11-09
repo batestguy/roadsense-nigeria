@@ -10,12 +10,15 @@ procurement records.
   corridor-months.
 - **Found:** the pre-specified test of that series against road-spending records **failed**, and the
   point estimate points the opposite way to the hypothesis.
-- **Next:** the article, then the polish pass.
+- **Next:** a publication decision on the drafted paper, then the polish pass, which is the work in
+  hand.
 - **Cost:** $0 in recurring spend.
 - **The report:** [batestguy.github.io/roadsense-nigeria/publish](https://batestguy.github.io/roadsense-nigeria/publish/) — five charts, the method, and
   what this does not claim.
 - **The data:** [JBZABC/roadsense-nigeria](https://huggingface.co/datasets/JBZABC/roadsense-nigeria) —
   five tables, four manifests, and a card that states the negative result first.
+- **The paper:** [10.5281/zenodo.24081356](https://doi.org/10.5281/zenodo.24081356) — a preprint under
+  CC BY 4.0; source in [`docs/paper.md`](docs/paper.md).
 
 ## The finding
 
