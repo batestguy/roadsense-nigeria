@@ -729,6 +729,38 @@ first gives 82.1 / 5.1 / 12.8. Both the figure and the order are stated wherever
 
 ---
 
+## F23 — The pre-registered test fails, and runs the opposite way to the hypothesis
+
+Measured 2026-11-09 on the complete series: 18,700 corridor-months, 850 corridors, 22 months.
+Bar fixed before the run at AUC ≥ 0.60 with the lower bound above 0.50.
+
+| Instrument | AUC | 95% interval |
+|---|---:|---|
+| **Primary — year-over-year change, pre-specified** | **0.3901** | 0.3196 – 0.4671 |
+| Secondary — trend slope, ≥ 15 months | 0.4318 | 0.3544 – 0.5137 |
+| Reference — raw contrast, no correction | 0.3133 | 0.2461 – 0.3881 |
+
+Sample: 644 corridors (66 labelled, 578 matched unlabelled), exact match on `primary_class` and
+length quintiles; all 66 labelled corridors survived matching. 100 label permutations put the real
+value outside the null (minimum 0.4145), so the difference is detectable — but it is in the direction
+opposite to the hypothesis.
+
+**Why it is not read as "maintenance works".** The raw, uncorrected contrast separates the two groups
+more strongly and in the same direction. The parsimonious explanation is that corridors with
+procurement records are a different kind of road — longer, more trunk, different verge and land cover
+— not that spending preserved them. Cost is at least the *absolute* spend per km, which is unmeasured
+here.
+
+**The first attempt at this test was invalid, not merely unlucky.** The initial score averaged
+`anom2` over the same corridor's months; `anom2` is already centred on the corridor mean, so the
+average is identically zero. 726 of 850 corridors shared one value (sd 7.9e-18); the apparent
+AUC 0.5735 was ranking month coverage (correlation 0.94). Full account in `.agent/T18-report.md`.
+
+**Consequence:** no hazard model on this measure. A new hypothesis may be tested only on data not
+used here, with the direction fixed before the run.
+
+---
+
 ## F10 — Findings that are still open
 
 | # | Open question | How it gets closed |
@@ -739,3 +771,4 @@ first gives 82.1 / 5.1 / 12.8. Both the figure and the order are stated wherever
 | O6 | ~~Does a road-minus-verge contrast beat centreline NDVI?~~ | **Closed** — it is measurable and signed correctly at 10 m; whether it predicts condition needs labels (F19) |
 | O4 | Are the 2024-heavy labels a budget artefact or a genuine deterioration signal? | Year fixed effects + a stated limitation; cannot be fully resolved |
 | O5 | Does Hugging Face Datasets serve Parquet efficiently enough for DuckDB `httpfs`? | **Partly closed** — anonymous range reads return 206 (F15); throughput still to be measured once a real file is uploaded |
+| O7 | Does the *reversed* association (spent-on corridors look less degraded) survive out of sample? | New data only: collect earlier years and fix the direction in writing before the run (F23) |

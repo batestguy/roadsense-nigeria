@@ -1,219 +1,156 @@
 # Handoff — read this first
 
-Last updated **2026-10-29**. Companion to `docs/findings.md` (what was measured),
-`docs/phases.md` (where the build is) and `preflight-spec.md` (what was agreed).
+Last updated **2026-11-09**. Companion to `docs/findings.md` (what was measured),
+`docs/phases.md` (where the build is) and `docs/article.md` (the argument in prose).
 
-If you are picking this up cold: read this page, then `docs/findings.md`. Everything else is
-detail you can look up when you need it.
+If you are picking this up cold: read this page, then `docs/findings.md`.
 
 ---
 
-## Where the project stands
+## What this project is now
 
-A corridor-level road intelligence pipeline for Nigeria's federal network, built on a zero-cost
-cloud stack. **Phases 0–2 complete; Phase 3 built and smoke-tested, national run not yet done.**
+It measures change on Nigeria's 850 named federal highway corridors from free satellite imagery,
+22 months at 10 m, and tests whether that measurement separates corridors that received maintenance
+money from comparable ones that did not.
+
+**It does not.** The pre-registered test failed, and the honest output is the measurement, the
+pipeline, and the negative result — not a model.
+
+## Where it stands
 
 | Layer | State |
 |---|---|
-| Labelling (Gate G0) | Done. Failed its threshold; the project re-scoped to corridors |
-| Corridor table | Done — 850 corridors, 18,419 km, geometry for all of them |
-| Dataset publishing | Code complete, **never uploaded** (needs `HF_TOKEN`) |
-| Imagery sampler | Done and measured — the cost model is measured, not estimated |
-| Backfill runner | Done, smoke-tested on a GitHub runner end to end |
-| Weather ingest | **Not started** |
-| Model / index / dashboard | **Not started** |
+| Corridor network | ✅ 850 corridors, 18,419 km |
+| Satellite measurement | ✅ 22 months, 2024-09 … 2026-06, 69,212 readings, every month complete |
+| Weather | ✅ monthly 18,700 corridor-months; daily rolling features 18,700 |
+| Condition measure | ✅ 18,700 corridor-months, corridor and month effects removed |
+| Validation against procurement records | ✅ run, **failed**: AUC 0.3901, bar 0.60 |
+| Hazard model | ⛔ **not proceeding** — see below |
+| Optimisation, budget allocation | ⛔ depends on the model |
+| Public report page | ✅ live |
+| Dataset | ✅ published, anonymous download verified |
+| Corridor map | ✅ inside the report page |
+| Article | ✅ written; preprint not started |
 
-Two things are unusual about this repo and worth internalising before reading code:
+### The three URLs
 
-1. **The unit is a corridor, not a segment.** Gate G0 showed the label join cannot support
-   segment-level work. `corridor_id` is the join key everywhere.
-2. **The notes are the product of the first two phases.** Several claims in the original proposal
-   were wrong, and `docs/findings.md` records the corrections with measurements. Do not
-   re-litigate them from the proposal; challenge the findings instead, with data.
+- **Report:** <https://batestguy.github.io/roadsense-nigeria/publish/>
+- **Data:** <https://huggingface.co/datasets/JBZABC/roadsense-nigeria>
+- **Source:** <https://github.com/batestguy/roadsense-nigeria>
 
----
+## The numbers, and what they mean
 
-## How long does the national backfill take?
-
-The question everyone asks, answered from measured rates rather than hope:
-
-| Quantity | Value | Source |
-|---|---:|---|
-| Distinct 8 km tiles containing highway | 2,016 | F18 |
-| Months per tile | 22 (default window 2024-09 … 2026-06) | script default |
-| Tile-months of work | 44,352 | 2,016 × 22 |
-| Seconds per tile-month at 10 m | **1–4** | **F21, measured on a runner** |
-| **Serial compute** | **12–49 h** | |
-| Bytes streamed at 10 m | **~70 GB** | F16/F17 |
-| Per shard at 96 shards | 8–31 min | 462 tile-months each |
-| **Wall clock** | **~1–3 h** | ~20 concurrent jobs, ~5 waves |
-
-**~1–3 hours wall clock, roughly 70 GB streamed, £0/$0** — measured, not projected, for two months,
-and extrapolated from there (F21). The earlier 12–20 h figure came from the 40 m workstation pilot,
-where every 8 km read cost nine overview requests instead of one base tile. Nothing is stored: the
-table that survives is a few MB.
-
-96 shards remains the default. The 6 h job limit no longer binds, but a cancelled job still loses
-whatever shard it was in, so smaller units are cheaper to lose.
-
----
-
-## Backfill progress (as of 2026-10-30, 23:56 UTC)
-
-The national run is being done in 2-month windows of 96 shards, ~18 min each (F21). Windows are
-disjoint, so each produces its own `imagery-r10` artifact; they concatenate on
-`(corridor_id, tile_x, tile_y, month)` at the end. Two windows are merged and a third is in
-flight:
-
-| Window | State | Run |
-|---|---|---|
-| 2024-09 … 2024-10 | ✅ merged, 6,292 rows | 41140244419 |
-| 2024-11 … 2024-12 | ✅ merged, 6,292 rows | 41142676535 |
-| 2025-01 … 2025-02 | ✅ merged | 41144644682 |
-| 2025-03 … 2025-04 | ▶ dispatched 23:46 | 41146408420 |
-| 2025-05 … 2026-06 | ⏳ 7 windows not dispatched | — |
-
-**Check the real state first** — this table is a snapshot, not a live view:
-
-```bash
-gh run list --workflow=backfill.yml --limit 12
-```
-
-**Resume one window at a time.** The workflow keeps only one *pending* run per concurrency group, so
-dispatching a batch silently cancels all but one. Adjust the list to skip windows already merged:
-
-```bash
-for w in "2025-05 2025-06" "2025-07 2025-08" "2025-09 2025-10" "2025-11 2025-12" \
-         "2026-01 2026-02" "2026-03 2026-04" "2026-05 2026-06"; do
-  set -- $w
-  gh workflow run backfill.yml -f resolution=10 -f shards=96 -f start=$1 -f end=$2
-  sleep 1200   # the run must finish before the next dispatch, or it is cancelled
- done
-```
-
-Notes for whoever picks this up cold:
-
-- Completed windows keep their artifacts for **90 days**. Nothing is lost if a session is cut off;
-  the loss is only of the ~18 min of the shard that was running.
-- The local driver used on 2026-10-30 is `data/run_sessions.sh` — gitignored, machine-local, and
-  without memory: restarting it replays windows from the top of its list. Use the loop above instead
-  unless you re-read that file first.
-- A per-window merge only proves the key is unique and the output is non-empty. The end-to-end
-  checks are the 22-artifact concatenation and the seasonal comparison in F22.
-
----
-
-## Running things
-
-```bash
-# Install. [geo] is needed for anything touching imagery.
-python -m pip install -e ".[dev,geo]"
-
-# Offline: 64 tests, no network
-python -m pytest tests -q
-python -m ruff check src tests scripts
-
-# Rebuild the corridor tables (network, ~65 MB, a few minutes)
-python scripts/run_gate0.py
-python scripts/build_corridors.py
-python scripts/build_geometry.py
-
-# Coverage and cost, no imagery downloaded
-python scripts/count_tiles.py
-
-# Measure a pilot for real (a few MB)
-python scripts/sample_pilot.py --months 3 --max-tiles 5
-
-# Resolution comparison; writes docs/resolution-ablation.md
-python scripts/ablate_resolution.py --tiles 3 --months 3
-
-# Backfill: plan, smoke, or run
-python scripts/backfill.py --shard 1/96 --dry-run
-python scripts/backfill.py --shard 1/96 --limit-tiles 3 --start 2026-06 --end 2026-06
-```
-
-To run the national job from GitHub:
-
-```bash
-gh workflow run backfill.yml -f resolution=10 -f start=2024-09 -f end=2026-06 -f shards=96
-```
-
----
-
-## Credentials
-
-Exactly one thing in this project needs a credential, and it is not the data.
-
-| Need | Status |
+| Quantity | Value |
 |---|---|
-| `HF_TOKEN` repo secret | **not set** — required only by `.github/workflows/pipeline.yml` |
-| Hugging Face account | does not exist yet |
-| Anything else | none — GRID3, DE Africa S3, OCDS, GitHub Pages are all anonymous |
+| Satellite readings | 69,212 (corridor × tile × month) |
+| Corridor-months | 18,700 = 850 × 22 |
+| Blank contrast values | 378 (0.55%) — left blank, never filled |
+| Corridor-months with no usable reading | 183 across 124 corridors |
+| Variance: month / corridor / residual | 5.9% / 81.2% / 12.8% (month entered first) |
+| Primary test (pre-registered) | AUC **0.3901**, interval 0.3196–0.4671, bar 0.60 |
+| Secondary (trend slope) | 0.4318, interval 0.3544–0.5137 |
+| Reference (raw contrast) | 0.3133, interval 0.2461–0.3881 |
+| Analysed sample | 644 corridors: 66 labelled, 578 matched unlabelled |
 
-Imagery reads, corpus downloads and the backfill need **no** credential. If a task appears to need
-one, something is being done the wrong way.
+**Read the direction, not just the number.** The whole interval lies below 0.50: corridors with a
+procurement record score as *less* degraded than comparable corridors without one. The association
+that does exist runs the same way as the raw, uncorrected appearance — which tracks road type and
+land cover, not maintenance.
 
----
+## The mistake worth knowing about
+
+The first validation score was **algebraically degenerate**. It averaged a value that had already
+been centred on each corridor's own mean, over the same corridor's months, which is identically zero.
+726 of 850 corridors received the same value to fifteen decimal places; the ranking came from which
+months were missing (correlation 0.94).
+
+It produced a plausible-looking AUC of 0.5735. It could not have detected anything. A gate now
+refuses to compute an AUC before checking that the score varies, and it runs **before** the test.
+
+Do not present that 0.5735 as a result, and do not mention the post-hoc mirror of the corrected test
+(0.6099) — it is recorded in the analysis files only so it can be recognised and refused.
 
 ## What is genuinely blocked
 
 | Blocked | On what |
 |---|---|
-| Any modelling | The national backfill — there are no features yet |
-| Dataset publication | `HF_TOKEN` |
-| Index validation | The backfill, plus a decision on the control group |
+| Any hazard model | The validation result. Do not build one on this measure. |
+| The reversed hypothesis | New data. Testing the mirror direction on the same numbers is not a test. |
+| A preprint | A literature review, and a decision that the article's framing survives contact with readers. |
+| A commercial deployment | The weather reanalysis is **non-commercial only**. The code is MIT; derived tables are CC BY-SA. |
 
-Nothing else is blocked. Everything in Phases 0–3 ran on live data.
-
----
+Nothing else is blocked. No credentials are needed to read the data or run the page.
 
 ## Decisions already made — do not re-open without new evidence
 
 | Decision | Why | Evidence |
 |---|---|---|
-| Corridors, not segments | GRID3 names 869 corridors, 850 once variant spellings are merged; 113,004 segments are unnamed | F11/F12/F20 |
+| Corridors, not segments | The label join cannot support segments: 113,004 GRID3 segments are unnamed | F11/F12/F20 |
 | 10 m imagery, not 40 m | 40 m flips the contrast sign on 20.6% of corridor-months | F19 |
-| Road-versus-verge contrast, not centreline NDVI | A centreline pixel is asphalt; NDVI ≈ 0 regardless of condition | F17/F19 |
-| Hugging Face, not Cloudflare R2 | R2 requires a payment method even on the free tier | F5 |
-| OpenTofu over Terraform | Terraform's licence; also the only infrastructure here is the repo itself | spec §10 |
-| 48 GB figure abandoned | F2's "20 m is 10× cheaper" compared tiles of different ground area | F16 |
-
----
+| Road-versus-verge contrast, not centreline NDVI | A centreline pixel is asphalt; NDVI ≈ 0 regardless of condition | F17 |
+| Month-first variance split is quoted with its order | The split is order-dependent (82.1/5.1 vs 5.9/81.2) | F22 note |
+| No model on the current measure | Two pre-specified instruments, both below the bar | F23 |
+| Publish the negative result | A tuned model would not survive the first interview question | this page |
 
 ## Traps that have already cost time
 
-1. **`names IS NOT NULL` is wrong on GRID3** — 113,004 segments carry an empty string. Use
-   `names <> ''`.
-2. **GRID3 geometry needs `outSR=4326`**, otherwise it arrives in Web Mercator metres and every
-   point-in-polygon test silently fails.
+1. **`names IS NOT NULL` is wrong on GRID3** — 113,004 segments carry an empty string.
+2. **GRID3 geometry needs `outSR=4326`**, or it arrives in Web Mercator metres.
 3. **`float('nan')` is truthy** — NaN passes `if value:` and defeats null guards.
-4. **Never read a partial window at the first overview level.** GDAL streams the entire 172 MB file.
-   Read the whole 8 km tile.
-5. **A `HEAD` with `Content-Length: 0` makes GDAL abandon range requests** and download whole files.
-6. **Do not dilate a mask and keep calling it the same thing.** A 50 m dilation at 40 m is one
-   pixel; that mistake produced a confident, entirely fake finding about Lagos.
-7. **Reading the published dataset is anonymous; publishing is not.** Keep that asymmetry.
+4. **Never read a partial window at the first overview level** — GDAL streams the whole 172 MB file.
+5. **A `HEAD` with `Content-Length: 0` makes GDAL abandon range requests.**
+6. **A path summed over its own window is identically zero.** Centring a value on a corridor's own
+   mean and then averaging that value over the same corridor gives zero, not a small number. This is
+   the T18 failure and it looked like a result.
+7. **A check that cannot fail is not a check.** Two tests in this project were written so that they
+   could not possibly fail (an sd ratio under a constant shift; a coverage counter). Both were caught
+   after the fact. When writing a guard, ask what input would break it, and run that input.
 
----
+## How to run it
 
-## Next, in order
+```bash
+python -m pip install -e ".[dev]"
+python -m pytest tests -q                 # 91 tests, no network, no credentials
+python -m ruff check src tests scripts
 
-1. **Run the national backfill** — `-f shards=96 -f resolution=10`. Expect 12–20 h.
-2. **Weather ingest** — Open-Meteo per 1° cell, ~150 calls, non-commercial licence. Independent of
-   the backfill; can be built before it finishes.
-3. **Corridor condition index** from `ndvi_contrast` / `ndbi_contrast` over time.
-4. **Validation with a control group.** Compare the 66 labelled corridors against *unlabelled
-   corridors of the same class and length band*. Without the control, a good AUC only proves that
-   busy federal corridors are busy.
-5. Then, and only then, modelling, optimisation and the map.
+python scripts/collect_imagery.py         # merge downloaded per-window artifacts, with coverage gates
+python scripts/build_weather.py           # Open-Meteo archive, no key
+python scripts/build_weather_daily.py     # rolling 30-day, 7-day max, dry spells
+python scripts/build_condition.py         # corpus + month effects removed
+python scripts/validate_signal_v2.py      # the pre-registered test
+python scripts/build_report.py            # regenerates docs/publish/index.html from the data
+python scripts/publish_hf.py              # stages and uploads the dataset
+```
 
-Deliberately deferred: dbt and Feast. The feature table is a few hundred thousand rows that pandas
-and DuckDB already handle; adding those layers now would be infrastructure without a user.
+The imagery is collected by workflow, one two-month window at a time:
+`gh workflow run backfill.yml -f resolution=10 -f shards=96 -f start=YYYY-MM -f end=YYYY-MM`.
+Each run streams its window and stores nothing. The windows' artifacts expire 90 days after each run
+(the eleven used here were produced 2026-10-30 and 2026-11-09).
 
----
+## Repository shape
 
-## Deliverables still missing
+| Path | Contents |
+|---|---|
+| `src/roadsense/` | `textmatch`, `states`, `gate0` (matching); `grid3`, `ocds` (ingestion); `corridors`, `geometry`; `tiles`, `sampler`, `netcount`; `hf`, `warehouse` |
+| `scripts/` | One CLI per pipeline stage, plus `build_report.py` and `publish_hf.py` |
+| `tests/` | 91 tests, including the guard tests that are proved to fail when the guard is removed |
+| `docs/publish/` | The generated report page and its `facts.json` — never hand-edited |
+| `docs/article.md` | The same argument for a reader who will not clone the repo |
+| `docs/handoff.md` | This page |
 
-Data dictionary, model card, architecture diagram, Quarto report, cost analysis, demo video,
-MapLibre site, Dagster demo DAG, Grafana dashboard. None exist. The README, findings register,
-pilot report, resolution ablation and this page do.
+Data does not live in git. `data/` is gitignored; the published copy is on Hugging Face.
+
+## What a new session should do first
+
+The user is preparing a polish pass and will bring suggestions. The items already identified:
+
+1. **The map's colour palette.** "Rising contrast" is drawn green, which reads as *better* when rising
+   contrast is not a good thing. One palette decision in `scripts/build_report.py`, then re-render and
+   re-measure.
+2. **README length.** 115 lines; a third of it belongs in `docs/`.
+3. **The article's voice.** It is written in the assistant's register, not the owner's. This is the
+   one that needs a human, and it matters most for the audience the page is for.
+4. **The preprint.** Not started, deliberately: it needs a literature review first.
+
+Before changing anything, run `python scripts/build_report.py` and confirm it reproduces the
+committed page byte-for-byte. If it does not, something has drifted and that matters more than polish.
