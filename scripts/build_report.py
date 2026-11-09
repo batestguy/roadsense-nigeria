@@ -320,22 +320,26 @@ def contrast_ratio(fg: str, bg: str) -> float:
 
 
 # --- palette ----------------------------------------------------------------------------
+# Three tarmac colours. Nothing on this page is red or green: a road that is getting worse
+# should not be painted the colour of a warning until the measurement is shown to mean that,
+# and a map arm in green reads as "good" when rising contrast is not good. Blue and violet are
+# the colours of a road surface, and they carry no verdict.
 INK = "#11161a"
 MUTED = "#4a545c"
 RULE = "#c4ccd2"
 PAPER = "#ffffff"
-GREEN = "#0e4d36"
-BROWN = "#6b4700"
-RED = "#8c1d18"
+TARMAC = "#1b3f5c"
+PLUM = "#4a3566"
+VIOLET = "#3d2a52"
 LIGHT = "#e3e8ea"
 
 TEXT_PAIRS = [
     ("body text", INK, PAPER),
     ("secondary text", MUTED, PAPER),
-    ("inverse on corridor segment", PAPER, GREEN),
-    ("inverse on month segment", PAPER, BROWN),
+    ("inverse on corridor segment", PAPER, TARMAC),
+    ("inverse on month segment", PAPER, PLUM),
     ("dark on residual segment", INK, LIGHT),
-    ("bar line label", RED, PAPER),
+    ("bar line label", VIOLET, PAPER),
     ("axis rule", MUTED, PAPER),
 ]
 
@@ -619,17 +623,17 @@ def svg_seasonal(f: dict[str, Any]) -> str:
         )
     points = " ".join(f"{x(i):.1f},{y(v):.1f}" for i, v in enumerate(values))
     parts.append(
-        f'<polyline points="{points}" fill="none" stroke="{GREEN}" stroke-width="2"/>'
+        f'<polyline points="{points}" fill="none" stroke="{TARMAC}" stroke-width="2"/>'
     )
     for i, v in enumerate(values):
         parts.append(
-            f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="2.4" fill="{GREEN}"/>'
+            f'<circle cx="{x(i):.1f}" cy="{y(v):.1f}" r="2.4" fill="{TARMAC}"/>'
         )
     # Annotate the two ends of the documented fall: September and December of the first year.
     for i, label in ((0, f["sep_label"]), (3, f["dec_label"])):
         parts.append(
             f'<circle cx="{x(i):.1f}" cy="{y(values[i]):.1f}" r="4.2" fill="{PAPER}" '
-            f'stroke="{RED}" stroke-width="2"/>'
+            f'stroke="{VIOLET}" stroke-width="2"/>'
         )
         parts.append(
             f'<text x="{x(i):.1f}" y="{y(values[i]) - 10:.1f}" font-size="12" '
@@ -638,7 +642,7 @@ def svg_seasonal(f: dict[str, Any]) -> str:
     mid_x = (x(0) + x(3)) / 2
     mid_y = (y(values[0]) + y(values[3])) / 2 - 4
     parts.append(
-        f'<text x="{mid_x:.1f}" y="{mid_y:.1f}" font-size="12" fill="{RED}" '
+        f'<text x="{mid_x:.1f}" y="{mid_y:.1f}" font-size="12" fill="{VIOLET}" '
         f'text-anchor="middle" font-weight="bold">falls {f["fall_pct"]}%</text>'
     )
     # x ticks: first month of each year boundary shown as written in the data.
@@ -649,7 +653,7 @@ def svg_seasonal(f: dict[str, Any]) -> str:
         )
     return (
         f'<svg viewBox="0 0 {w} {h}" role="img" aria-labelledby="c1t c1d" class="chart">'
-        '<title id="c1t">Seasonal fall in the road-versus-verge contrast</title>'
+        '<title id="c1t">Seasonal fall in the gap between the road and its verge</title>'
         '<desc id="c1d">Line chart of the national monthly mean contrast over twenty-two '
         'months. It rises to a peak of ' + f["max_value"] + " and falls to "
         + f["min_value"] + ", dropping " + f["fall_pct"] + " per cent between "
@@ -692,7 +696,7 @@ def svg_degenerate(f: dict[str, Any]) -> str:
         dominant = b["count"] == f["modal_count"]
         parts.append(
             f'<rect x="{x0 + 0.5:.1f}" y="{yy:.1f}" width="{slot - 1.5:.1f}" '
-            f'height="{bottom - yy:.1f}" fill="{GREEN if dominant else MUTED}"/>'
+            f'height="{bottom - yy:.1f}" fill="{TARMAC if dominant else MUTED}"/>'
         )
         if dominant:
             parts.append(
@@ -765,10 +769,10 @@ def svg_forest(f: dict[str, Any]) -> str:
     )
     parts.append(
         f'<line x1="{x(bar):.1f}" y1="{top - 14}" x2="{x(bar):.1f}" y2="{bottom}" '
-        f'stroke="{RED}" stroke-width="2"/>'
+        f'stroke="{VIOLET}" stroke-width="2"/>'
     )
     parts.append(
-        f'<text x="{x(bar) + 4:.1f}" y="{top - 32}" font-size="11" fill="{RED}">'
+        f'<text x="{x(bar) + 4:.1f}" y="{top - 32}" font-size="11" fill="{VIOLET}">'
         f'bar {f["bar"]}</text>'
     )
     step = (bottom - top - 20) / max(1, len(rows) - 1)
@@ -791,11 +795,11 @@ def svg_forest(f: dict[str, Any]) -> str:
             f'<path d="M {x(float(row["auc"])):.1f} {yy - 5:.1f} '
             f'L {x(float(row["auc"])) + 5:.1f} {yy:.1f} '
             f'L {x(float(row["auc"])):.1f} {yy + 5:.1f} '
-            f'L {x(float(row["auc"])) - 5:.1f} {yy:.1f} Z" fill="{RED}"/>'
+            f'L {x(float(row["auc"])) - 5:.1f} {yy:.1f} Z" fill="{VIOLET}"/>'
         )
     parts.append(
         f'<text x="{plot_l}" y="{h - 10}" font-size="11" fill="{MUTED}">'
-        "AUC, higher is better; the red line is the bar</text>"
+        "AUC, higher is better; the violet line is the bar</text>"
     )
     return (
         f'<svg viewBox="0 0 {w} {h}" role="img" aria-labelledby="c3t c3d" class="chart">'
@@ -813,17 +817,17 @@ def svg_variance(f: dict[str, Any]) -> str:
     left, right, top = 40, 430, 42
     bar_h = 48
     shares = [
-        ("Corridor", float(f["corridor"]), GREEN, PAPER, "corr"),
-        ("Month", float(f["month"]), BROWN, PAPER, "month"),
+        ("Corridor", float(f["corridor"]), TARMAC, PAPER, "corr"),
+        ("Month", float(f["month"]), PLUM, PAPER, "month"),
         ("Residual", float(f["residual"]), LIGHT, INK, "resid"),
     ]
     total = sum(s for _, s, _, _, _ in shares)
     parts = [
         '<defs>'
         f'<pattern id="pat-corr" width="6" height="6" patternUnits="userSpaceOnUse">'
-        f'<rect width="6" height="6" fill="{GREEN}"/></pattern>'
+        f'<rect width="6" height="6" fill="{TARMAC}"/></pattern>'
         f'<pattern id="pat-month" width="6" height="6" patternUnits="userSpaceOnUse">'
-        f'<rect width="6" height="6" fill="{BROWN}"/>'
+        f'<rect width="6" height="6" fill="{PLUM}"/>'
         f'<line x1="0" y1="0" x2="0" y2="6" stroke="{PAPER}" stroke-width="2"/></pattern>'
         f'<pattern id="pat-resid" width="6" height="6" patternUnits="userSpaceOnUse">'
         f'<rect width="6" height="6" fill="{LIGHT}"/>'
@@ -1160,11 +1164,11 @@ def svg_map(layer: dict[str, Any]) -> str:
     ]
     return (
         f'<svg viewBox="0 0 {MAP_W} {MAP_H}" role="img" aria-labelledby="c5t c5d" class="chart">'
-        '<title id="c5t">Where the road-versus-verge contrast moved, corridor by corridor</title>'
+        '<title id="c5t">Where the gap between the road and its verge moved, corridor by corridor</title>'
         '<desc id="c5d">Map of '
         + facts["n_corridors_label"]
         + " federal road corridors across Nigeria, coloured by mean year-over-year change in the "
-        "road-versus-verge vegetation contrast over "
+        "gap between the road surface and the vegetation beside it, over "
         + facts["months_in_window"]
         + " months. "
         + facts["fall_hard"]
@@ -1211,16 +1215,19 @@ CSS = """
 body { margin:0; background:#ffffff; color:#11161a;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   line-height:1.55; font-size:1rem; }
-/* A faint tarred road behind the page. Kept at 5.5% so the paper stays the surface the text
-   sits on: at that weight the darkest pixel in the photograph composites to about #f1f1f1, and
-   the body text still measures above 16:1 against it. Decorative, so it carries no meaning and
-   is hidden from assistive technology by being a CSS background, not an image element. */
+/* A tarred highway runs behind the page and the writing sits on it, the way a road sits in the
+   middle of its own carriageways. The photograph is held at 68% and the text sits on a 93% white
+   panel, so the road is visible in the margins and the words stay on paper: the panel is within
+   two points of pure white, which is why the contrast checks below, measured against PAPER, still
+   describe what a reader sees. Decorative, so it is a CSS background and carries no meaning. */
 body::before { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
-  background:url("img/watermark-road.jpg") center top / cover no-repeat; opacity:.055; }
+  background:url("img/highway-bg.jpg") center center / cover no-repeat; opacity:.68; }
 .skip { position:absolute; left:-999px; top:0; background:#ffffff; color:#11161a;
   padding:.6rem 1rem; z-index:10; }
-.skip:focus { left:.5rem; top:.5rem; outline:3px solid #0e4d36; }
-main { max-width:74ch; margin:0 auto; padding:1.25rem 1rem 3rem; }
+.skip:focus { left:.5rem; top:.5rem; outline:3px solid #1b3f5c; }
+main { max-width:74ch; margin:1.6rem auto 2.5rem; padding:1.9rem 1.9rem 3.2rem;
+  background:rgba(255,255,255,.93); border-radius:4px;
+  box-shadow:0 1px 0 rgba(17,22,26,.05), 0 24px 60px -28px rgba(17,22,26,.55); }
 h1 { font-size:1.6rem; line-height:1.25; margin:.2rem 0 .6rem; letter-spacing:-.01em; }
 h2 { font-size:1.15rem; margin:2.2rem 0 .5rem; border-bottom:1px solid #c4ccd2;
   padding-bottom:.3rem; }
@@ -1228,7 +1235,9 @@ h3 { font-size:1rem; margin:1.4rem 0 .3rem; }
 p, li { max-width:70ch; }
 .lede { font-size:1.05rem; color:#1d242a; }
 .eyebrow { text-transform:uppercase; letter-spacing:.08em; font-size:.75rem;
-  color:#4a545c; margin:0 0 .4rem; }
+  color:#4a545c; margin:0 0 .4rem; display:flex; align-items:center; gap:.45rem; }
+.flag { display:block; width:21px; height:14px; flex:0 0 auto;
+  box-shadow:0 0 0 1px rgba(17,22,26,.18); }
 .finding { border:2px solid #11161a; border-left-width:8px; padding:1rem 1.1rem;
   margin:1.4rem 0 1.8rem; background:#f7f9fa; }
 .finding .score { font-size:2.6rem; font-weight:700; line-height:1; margin:0; }
@@ -1253,18 +1262,18 @@ figure.photo figcaption { font-size:.85rem; }
 .credits { list-style:none; margin:.5rem 0 0; padding:0; font-size:.88rem; }
 .credits li { margin:0 0 .35rem; max-width:none; }
 .tblwrap { overflow-x:auto; margin-top:.7rem; }
-.tblwrap:focus-visible { outline:3px solid #8c1d18; outline-offset:2px; }
+.tblwrap:focus-visible { outline:3px solid #3d2a52; outline-offset:2px; }
 table { border-collapse:collapse; font-size:.88rem; min-width:26rem; width:100%; }
 caption { text-align:left; font-size:.85rem; color:#4a545c; padding-bottom:.35rem; }
 th, td { border-bottom:1px solid #c4ccd2; padding:.3rem .5rem; text-align:right; }
 th:first-child, td:first-child { text-align:left; }
 thead th { border-bottom:2px solid #11161a; }
 details { margin-top:.6rem; font-size:.9rem; }
-summary { cursor:pointer; color:#0e4d36; text-decoration:underline; padding:.2rem 0; }
-summary:focus-visible, a:focus-visible { outline:3px solid #8c1d18; outline-offset:2px; }
-a { color:#0e4d36; }
+summary { cursor:pointer; color:#1b3f5c; text-decoration:underline; padding:.2rem 0; }
+summary:focus-visible, a:focus-visible { outline:3px solid #3d2a52; outline-offset:2px; }
+a { color:#1b3f5c; }
 .tablenote { font-size:.85rem; color:#4a545c; margin:.45rem 0 0; }
-.nonclaims { background:#f7f9fa; border-left:4px solid #6b4700; padding:.8rem 1rem;
+.nonclaims { background:#f7f9fa; border-left:4px solid #4a3566; padding:.8rem 1rem;
   margin:1rem 0; }
 .nonclaims ol { margin:.4rem 0 0; padding-left:1.2rem; }
 .legend { list-style:none; margin:.7rem 0 0; padding:0; display:flex; flex-wrap:wrap;
@@ -1274,13 +1283,14 @@ a { color:#0e4d36; }
 .sw-dashed { border:1px dashed #4a545c; }
 .sw-dot { background:transparent; border:2px dotted #11161a; }
 .mapnote { font-size:.88rem; color:#1d242a; margin:.5rem 0 .7rem; }
-.caveat { border-left:4px solid #8c1d18; padding:.15rem 0 .15rem .8rem; margin:.7rem 0 .5rem;
+.caveat { border-left:4px solid #3d2a52; padding:.15rem 0 .15rem .8rem; margin:.7rem 0 .5rem;
   font-size:.95rem; }
 footer { margin-top:2.6rem; border-top:1px solid #c4ccd2; padding-top:1rem;
   font-size:.82rem; color:#3d464d; }
 footer code { font-size:.8rem; word-break:break-all; }
 @media (max-width:26rem) {
   h1 { font-size:1.35rem; }
+  main { margin:.5rem; padding:1.25rem 1rem 2.5rem; background:rgba(255,255,255,.96); }
   .finding .score { font-size:2.1rem; }
   .finding dl { grid-template-columns:1fr; }
   .finding dd { margin-bottom:.5rem; }
@@ -1402,27 +1412,29 @@ def render(f: dict[str, Any]) -> str:
     map_rows = [[b["label"], b["count_label"]] for b in mapf["bands"]]
 
     body = f"""
-<p class="eyebrow">RoadSense Nigeria &middot; measured <time>{esc(checks["imagery_generated"])}</time></p>
-<h1>The road condition signal does not clear its own bar</h1>
+<p class="eyebrow"><svg class="flag" viewBox="0 0 30 20" aria-hidden="true" focusable="false"><rect width="10" height="20" fill="#008751"/><rect x="10" width="10" height="20" fill="#ffffff"/><rect x="20" width="10" height="20" fill="#008751"/></svg>RoadSense Nigeria &middot; measured <time>{esc(checks["imagery_generated"])}</time></p>
+<h1>A satellite can show you a bad road. It could not show you a road getting worse.</h1>
 
 <div class="photostrip">
 {photo_figure(photos[0])}
 {photo_figure(photos[1])}
 </div>
 
-<p>The World Bank puts the paved share of Nigeria's road network at {ext["paved_share"]["value"]}
-per cent. Above are the two ends of that range: a Lagos street where buses and vans pick their
-way through standing water, and a dual carriageway outside Abuja, empty, lit and drained.</p>
+<p>Only {ext["paved_share"]["value"]} per cent of Nigeria's roads are paved, according to the World
+Bank. The rest are earth, gravel, or something a lorry leaves behind in the rain. The two photographs
+above are the ends of that range: a Lagos street where buses and vans nose through standing water, and
+a dual carriageway outside Abuja, empty, lit and drained.</p>
 
-<p>A photograph shows which of the two a road is on the day it was taken. It does not show which
-way the road is heading. The flooded street may flood every rainy season and be no worse than
-ten years ago; the carriageway may be losing its verge now.</p>
+<p>A photograph tells you which of those two a road is on the day somebody pressed the shutter. It
+cannot tell you which way the road is going. The flooded street may flood every rainy season and be no
+worse than it was ten years ago. The clean carriageway may be quietly losing its verge, year by year,
+in a way no single picture would ever show.</p>
 
-<p>In {ext["poor_condition"]["as_of"]} the World Bank put
-{ext["poor_condition"]["value"]} per cent of federal roads in poor condition. That is one year's
-reading, not a trend. This page measures movement instead, over {fint(h1["n_corridors"])}
-federal corridors and {mapf["total_km"]}&nbsp;km of them: not which roads look bad today, but
-which are getting worse.</p>
+<p>In {ext["poor_condition"]["as_of"]} the World Bank put {ext["poor_condition"]["value"]} per cent of
+federal roads in poor condition. That is one year's reading, not a trend, and it says nothing about any
+particular road. What a maintenance budget needs to know is different: of the {fint(h1["n_corridors"])}
+stretches of federal highway measured here — {mapf["total_km"]}&nbsp;km of road, each stretch long
+enough to have a name and a budget line — which ones are getting worse?</p>
 
 <h2>What the record says</h2>
 
@@ -1440,25 +1452,28 @@ below asks whether the second predicts the first.</p>
 
 <h2>The result</h2>
 
-<p class="lede">One page on what this project measured across {fint(h1["n_corridors"])}
-federal road corridors, why the measurement failed its pre-specified test, and what it
-still supports.</p>
+<p class="lede">Can a free satellite photograph tell a road agency which of its roads are falling
+apart? This page reports the attempt: 850 stretches of Nigerian federal highway, 22 months, and one
+test that was written down before it was run. The test failed.</p>
 
 <div class="finding">
-  <p class="score">{h1["auc"]}<span class="unit">area under the curve, primary instrument</span></p>
+  <p class="score">{h1["auc"]}<span class="unit">the score. Half, {h1["chance"]}, is a coin toss</span></p>
   <dl>
-    <dt>Interval</dt><dd>{h1["lo"]} to {h1["hi"]}</dd>
-    <dt>Bar to clear</dt><dd>{h1["bar"]} point estimate, with the lower bound above {h1["chance"]}</dd>
-    <dt>Direction</dt><dd>below chance ({h1["chance"]}): corridors with recorded spending
-      score as <em>less</em> degraded than those without</dd>
-    <dt>Sample</dt><dd>{fint(h1["n_matched"])} corridors analysed,
-      {fint(h1["n_labelled"])} with a label, {fint(h1["n_unlabelled"])} without</dd>
+    <dt>Plausible range</dt><dd>{h1["lo"]} to {h1["hi"]}</dd>
+    <dt>Bar to clear</dt><dd>{h1["bar"]} point estimate, with the lower end above {h1["chance"]}</dd>
+    <dt>Direction</dt><dd>below a coin toss ({h1["chance"]}): roads with recorded spending score as
+      <em>less</em> degraded than roads without</dd>
+    <dt>Sample</dt><dd>{fint(h1["n_matched"])} roads compared,
+      {fint(h1["n_labelled"])} of them with a payment on record, {fint(h1["n_unlabelled"])} without</dd>
   </dl>
 </div>
 
-<p>The result is not "the effect is small". It is that the instrument ranks the labelled
-corridors the wrong way round, so it cannot be used to allocate maintenance, and this page
-exists to say so before anything else on it.</p>
+<p>The number is a ranking score, and it is worth saying plainly what it ranks. Take two roads, one
+with a payment on record and one without. A score of {h1["chance"]} means the measure picks between
+them no better than a coin. Above that, it usually picks the funded road as the one in worse shape.
+Below it, it picks the funded road as the one in <em>better</em> shape — which is what happened here.
+So the failure is not "the effect is small". It is "the measure points the wrong way", and a measure
+that points the wrong way cannot be used to send crews anywhere.</p>
 
 <h2>The five figures</h2>
 
@@ -1474,7 +1489,7 @@ exists to say so before anything else on it.</p>
   <p class="caveat"><strong>This shows movement, not condition.</strong> A corridor that has always
   been poor and one that has always been good look the same here. It cannot rank roads against
   each other nationally.</p>
-  <span class="what">Shows: the mean year-over-year change in the road-versus-verge contrast for
+  <span class="what">Shows: the mean year-over-year change in the gap between the road and its verge for
   each corridor, over the {mapf["months_in_window"]} months where a year-earlier pair exists
   ({mapf["window_label"]}). The comparison is each corridor against itself, the same calendar
   month one year earlier, so a road's own level is differenced out and the season is held fixed:
@@ -1489,7 +1504,7 @@ exists to say so before anything else on it.</p>
   over the period.</span>
 </figcaption>
 <details><summary>The same numbers as a table</summary>
-{table("Corridors by change in the road-versus-verge contrast, over the change window",
+{table("Corridors by change in the gap between the road and its verge, over the change window",
        ["Band", "Corridors"], map_rows)}
 <p class="tablenote">The map is one SVG drawn from {mapf["source_vertices"]} source vertices,
 simplified to {mapf["drawn_vertices"]} for this page at a tolerance of about half a display
@@ -1502,7 +1517,7 @@ pixel, and clipped to the corridor bounding box
 {svg_seasonal(seasonal)}
 <figcaption>
   <strong>The seasonal trap.</strong>
-  <span class="what">Shows: the raw contrast falls {seasonal["fall_pct"]} per cent on corridor
+  <span class="what">Shows: the raw gap falls {seasonal["fall_pct"]} per cent on corridor
   means over the full {fint(seasonal["n_months"])} months, from
   {esc(seasonal["sep_month"])} to {esc(seasonal["dec_month"])}, with no road changing
   (F22 measured {seasonal["f22_pct"]} per cent on tile-row means over the first four months).
@@ -1568,7 +1583,7 @@ histogram drawn with {degenerate["n_bins"]} equal bins between {degenerate["x_mi
   land cover, weather and registration differences all sit in it.</span>
 </figcaption>
 <details><summary>The same numbers as a table</summary>
-{table("Variance decomposition of the raw contrast, sequential month then corridor",
+{table("Where the variation sits in the raw gap, month counted before road",
        ["Component", "Share of total"], [
            ["Month, entered first", var["month"] + "%"],
            ["Corridor, entered second", var["corridor"] + "%"],
@@ -1625,9 +1640,9 @@ GitHub</a>.</p>
 <ul class="credits">
   <li><strong>Photographs.</strong> Tunde Olowookere (a Lagos road, 2020); Taini Ozeto (dual
   carriageway outside Abuja); Ayodele Adeniji (concrete in Bogije, Lagos); Okechukwu Iroegbu (an
-  earth road through a market at Akara); Wikisoft bros (a tarred road, used as the faint page
-  watermark). All five images are <a href="{LICENCE_URL}">{LICENCE_NAME}</a>; each caption above
-  carries its own credit.</li>
+  earth road through a market at Akara); Ifexmeco (the dual carriageway that runs behind the page,
+  sand-storm light and all). All five images are <a href="{LICENCE_URL}">{LICENCE_NAME}</a>; each
+  caption above carries its own credit.</li>
   <li><strong>Outside figures.</strong> {ext["paved_share"]["value"]} per cent of the road
   network paved, and {ext["poor_condition"]["value"]} per cent of federal roads in poor
   condition in {ext["poor_condition"]["as_of"]}: {esc(ext["paved_share"]["source"])},
@@ -1651,7 +1666,7 @@ external fonts, no scripts. Input digests, first sixteen characters of SHA-256:<
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>RoadSense Nigeria &mdash; the corridor condition signal does not clear its bar</title>
+<title>RoadSense Nigeria &mdash; a satellite can show a bad road, not a road getting worse</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230e4d36'/%3E%3C/svg%3E">
 <meta name="description" content="One page: what was measured on Nigeria's federal road
 corridors, why the condition signal failed its pre-specified test, and what it still
